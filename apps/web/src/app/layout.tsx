@@ -10,14 +10,14 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "BugSniff — Bug reports com contexto real",
+  title: "BugSniff — Seu usuário achou o bug. Você recebe o replay.",
   description:
-    "Instale um script no site ou distribua a extensão para seu time. Os reports chegam com replay, rede e logs — sem ida e volta.",
+    "Cole um script no seu SaaS em 30 segundos. Cada bug report chega com sessão gravada, logs de rede e console — sem ida e volta.",
   metadataBase: new URL("https://bugsniff.com.br"),
   openGraph: {
-    title: "BugSniff — Bug reports com contexto real",
+    title: "BugSniff — Seu usuário achou o bug. Você recebe o replay.",
     description:
-      "Bug reports que devs conseguem reproduzir. Replay completo, network logs, console — de testers ou dos seus próprios usuários.",
+      "Cole um script no seu SaaS em 30 segundos. Cada bug report chega com sessão gravada, logs de rede e console — sem ida e volta.",
     url: "https://bugsniff.com.br",
     siteName: "BugSniff",
     locale: "pt_BR",

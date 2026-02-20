@@ -4,15 +4,12 @@ interface CtaSectionProps {
 
 export default function CtaSection({ onCta }: CtaSectionProps) {
   return (
-    <section className="py-24 px-6 border-t border-[#1f1f1f] bg-[#0d0d0d]">
+    <section className="py-24 px-6 border-t border-border bg-page-alt">
       <div className="max-w-2xl mx-auto text-center flex flex-col items-center gap-6">
-        <h2
-          className="text-3xl sm:text-4xl font-bold text-[#ededed]"
-          style={{ fontFamily: "var(--font-geist)" }}
-        >
+        <h2 className="font-geist text-3xl sm:text-4xl font-bold text-primary">
           Chega de &quot;não consigo reproduzir&quot;
         </h2>
-        <p className="text-[#a3a3a3] text-base leading-relaxed">
+        <p className="text-secondary text-base leading-relaxed">
           BugSniff está em desenvolvimento. Entre na lista de espera e seja
           avisado quando abrir o acesso — e ajude a moldar o produto com seu
           feedback.
@@ -20,18 +17,18 @@ export default function CtaSection({ onCta }: CtaSectionProps) {
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <button
             onClick={onCta}
-            className="px-6 py-3 rounded-md bg-[#3b82f6] hover:bg-[#2563eb] text-white font-medium text-base transition-colors cursor-pointer"
+            className="px-6 py-3 rounded-md bg-accent hover:bg-accent-dark text-white font-medium text-base transition-colors cursor-pointer"
           >
             Entrar na lista de espera
           </button>
           <a
             href="mailto:contato@bugsniff.com.br"
-            className="text-sm text-[#a3a3a3] hover:text-[#ededed] transition-colors"
+            className="text-sm text-secondary hover:text-primary transition-colors"
           >
             Ou fale direto →
           </a>
         </div>
-        <div className="flex items-center gap-6 text-xs text-[#a3a3a3]">
+        <div className="flex items-center gap-6 text-xs text-secondary">
           <span>✓ Gratuito para começar</span>
           <span>✓ Sem cartão de crédito</span>
           <span>✓ Aviso por email</span>

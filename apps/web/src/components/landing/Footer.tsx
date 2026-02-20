@@ -4,31 +4,23 @@ interface FooterProps {
 
 export default function Footer({ onCta }: FooterProps) {
   return (
-    <footer className="py-10 px-6 border-t border-[#1f1f1f]">
+    <footer className="py-10 px-6 border-t border-border">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <BugIcon />
-          <span
-            className="text-sm font-semibold text-[#ededed]"
-            style={{ fontFamily: "var(--font-geist)" }}
-          >
-            BugSniff
-          </span>
-          <span className="text-xs text-[#a3a3a3] ml-2">
-            © {new Date().getFullYear()}
-          </span>
+          <span className="font-geist text-sm font-semibold text-primary">BugSniff</span>
+          <span className="text-xs text-secondary ml-2">© {new Date().getFullYear()}</span>
         </div>
-
-        <div className="flex items-center gap-6 text-xs text-[#a3a3a3]">
+        <div className="flex items-center gap-6 text-xs text-secondary">
           <a
             href="mailto:contato@bugsniff.com.br"
-            className="hover:text-[#ededed] transition-colors"
+            className="hover:text-primary transition-colors"
           >
             contato@bugsniff.com.br
           </a>
           <button
             onClick={onCta}
-            className="hover:text-[#ededed] transition-colors cursor-pointer"
+            className="hover:text-primary transition-colors cursor-pointer"
           >
             Lista de espera
           </button>
@@ -41,14 +33,10 @@ export default function Footer({ onCta }: FooterProps) {
 function BugIcon() {
   return (
     <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#3b82f6"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      width="16" height="16" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round"
+      className="text-accent"
     >
       <path d="M8 2l1.88 1.88" />
       <path d="M14.12 3.88 16 2" />

@@ -19,7 +19,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
+    <main className="min-h-screen bg-page text-primary">
       <Hero onCta={() => openModal("hero")} />
       <HowItWorks />
       <Problem />

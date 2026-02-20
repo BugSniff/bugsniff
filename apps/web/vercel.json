@@ -1,5 +1,0 @@
-{
-  "framework": "nextjs",
-  "buildCommand": "cd ../.. && pnpm turbo build --filter=@bugsniff/web",
-  "installCommand": "cd ../.. && pnpm install"
-}

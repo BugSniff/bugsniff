@@ -1,14 +1,28 @@
 {
   "name": "bugsniff",
+  "version": "0.1.0",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "geist": "^1.4.1",
+    "next": "15",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "turbo": "^2.3.3"
+    "@tailwindcss/postcss": "^4.2.0",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.2.0",
+    "typescript": "^5.9.3"
   },
   "packageManager": "pnpm@9.15.4"
 }

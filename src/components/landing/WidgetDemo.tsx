@@ -14,8 +14,8 @@ const activityData = [
 
 const logEventStyles = [
   { icon: "↖", iconCls: "text-accent", labelCls: "text-secondary", t: "00:41" },
-  { icon: "✕", iconCls: "text-error",  labelCls: "text-error",     t: "00:42" },
-  { icon: "⇅", iconCls: "text-error",  labelCls: "text-error",     t: "00:42" },
+  { icon: "✕", iconCls: "text-error", labelCls: "text-error", t: "00:42" },
+  { icon: "⇅", iconCls: "text-error", labelCls: "text-error", t: "00:42" },
 ];
 
 interface WidgetDemoProps {
@@ -26,7 +26,7 @@ interface WidgetDemoProps {
 
 export default function WidgetDemo({ onTicketCreated, onClose, locale = "pt" }: WidgetDemoProps) {
   const t = content[locale].widget;
-  const [step, setStep] = useState<Step>("closed");
+  const [step, setStep] = useState<Step>("open");
   const isOpen = step !== "closed";
 
   const toggle = () => {
@@ -80,10 +80,10 @@ export default function WidgetDemo({ onTicketCreated, onClose, locale = "pt" }: 
         {/* Widget panel */}
         {isOpen && (
           <div className="w-72 rounded-xl bg-surface border border-border shadow-2xl overflow-hidden animate-slide-up-widget">
-            {step === "open"      && <OpenState onSend={handleSendReport} t={t} />}
-            {step === "sending"   && <SendingState label={t.capturingLabel} sub={t.capturingSub} />}
+            {step === "open" && <OpenState onSend={handleSendReport} t={t} />}
+            {step === "sending" && <SendingState label={t.capturingLabel} sub={t.capturingSub} />}
             {step === "replaying" && <ReplayingState onCreateTicket={handleCreateTicket} t={t} />}
-            {step === "creating"  && <SendingState label={t.creatingLabel} sub={t.creatingSub} />}
+            {step === "creating" && <SendingState label={t.creatingLabel} sub={t.creatingSub} />}
             {step === "ticketing" && <TicketingState t={t} />}
           </div>
         )}

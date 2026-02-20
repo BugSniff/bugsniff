@@ -1,4 +1,5 @@
 import { content, type Locale } from "@/lib/content";
+import LocaleToggle from "./LocaleToggle";
 
 interface FooterProps {
   onCta: () => void;
@@ -11,26 +12,27 @@ export default function Footer({ onCta, locale = "pt" }: FooterProps) {
   return (
     <footer className="py-10 px-6 border-t border-border">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <BugIcon />
-          <span className="font-geist text-sm font-semibold text-primary">BugSniff</span>
-          <span className="text-xs text-secondary ml-2">© {new Date().getFullYear()}</span>
+          <div className="flex items-center gap-2">
+            <BugIcon />
+            <span className="font-geist text-sm font-semibold text-primary">BugSniff</span>
+            <span className="text-xs text-secondary ml-2">© {new Date().getFullYear()}</span>
+          </div>
+          <div className="flex items-center gap-4 sm:gap-6 text-xs text-secondary">
+            <LocaleToggle locale={locale} className="text-xs" />
+            <a
+              href={`mailto:${t.email}`}
+              className="hover:text-primary transition-colors"
+            >
+              {t.email}
+            </a>
+            <button
+              onClick={onCta}
+              className="hover:text-primary transition-colors cursor-pointer"
+            >
+              {t.waitlist}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-6 text-xs text-secondary">
-          <a
-            href={`mailto:${t.email}`}
-            className="hover:text-primary transition-colors"
-          >
-            {t.email}
-          </a>
-          <button
-            onClick={onCta}
-            className="hover:text-primary transition-colors cursor-pointer"
-          >
-            {t.waitlist}
-          </button>
-        </div>
-      </div>
     </footer>
   );
 }

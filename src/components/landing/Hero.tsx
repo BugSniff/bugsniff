@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import WidgetDemo from "./WidgetDemo";
+import LocaleToggle from "./LocaleToggle";
 import { content, type Locale } from "@/lib/content";
 
 /* ─── Data ──────────────────────────────────────────────── */
@@ -25,14 +26,14 @@ const ticketLogStyles = [
 ];
 
 const consoleLogs: { prefix: string | null; cls: string; text: string }[] = [
-  { prefix: "log",   cls: "text-secondary/60", text: "Cart loaded  {items: 3, total: 249.90}" },
-  { prefix: "log",   cls: "text-secondary/60", text: "Applying coupon code PROMO10..." },
-  { prefix: "log",   cls: "text-secondary/60", text: "Initiating checkout..." },
-  { prefix: "warn",  cls: "text-warning",       text: "Missing required field: billing.address" },
-  { prefix: "error", cls: "text-error",         text: "TypeError: Cannot read properties of undefined (reading 'id')" },
-  { prefix: null,    cls: "text-error/50",      text: "    at CheckoutForm.handleSubmit (checkout.js:142:18)" },
-  { prefix: null,    cls: "text-error/50",      text: "    at HTMLButtonElement.onClick (checkout.js:89:5)" },
-  { prefix: null,    cls: "text-error/50",      text: "    at EventTarget.dispatchEvent (native)" },
+  { prefix: "log", cls: "text-secondary/60", text: "Cart loaded  {items: 3, total: 249.90}" },
+  { prefix: "log", cls: "text-secondary/60", text: "Applying coupon code PROMO10..." },
+  { prefix: "log", cls: "text-secondary/60", text: "Initiating checkout..." },
+  { prefix: "warn", cls: "text-warning", text: "Missing required field: billing.address" },
+  { prefix: "error", cls: "text-error", text: "TypeError: Cannot read properties of undefined (reading 'id')" },
+  { prefix: null, cls: "text-error/50", text: "    at CheckoutForm.handleSubmit (checkout.js:142:18)" },
+  { prefix: null, cls: "text-error/50", text: "    at HTMLButtonElement.onClick (checkout.js:89:5)" },
+  { prefix: null, cls: "text-error/50", text: "    at EventTarget.dispatchEvent (native)" },
 ];
 
 /* ─── Hero ──────────────────────────────────────────────── */
@@ -59,15 +60,28 @@ export default function Hero({ onCta, locale = "pt" }: HeroProps) {
             BugSniff
           </span>
         </div>
-        <button
-          onClick={onCta}
-          className="text-sm text-secondary hover:text-primary transition-colors cursor-pointer"
-        >
-          {t.navCta}
-        </button>
+        <div className="flex items-center gap-3 sm:gap-5">
+          <LocaleToggle locale={locale} />
+
+        </div>
       </nav>
 
       <div className="relative z-10 max-w-4xl mx-auto text-center flex flex-col items-center gap-8">
+        <a
+          href="https://www.producthunt.com/products/bugsniff?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-bugsniff"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="opacity-90 hover:opacity-100 transition-opacity shrink-0"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt="BugSniff - User found the bug. You get the replay. | Product Hunt"
+            width={150}
+            height={34}
+            src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1082876&theme=dark&t=1771613241649"
+            className="h-9 w-auto sm:h-[54px]"
+          />
+        </a>
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-surface text-xs text-secondary">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
@@ -87,13 +101,18 @@ export default function Hero({ onCta, locale = "pt" }: HeroProps) {
           <span className="text-primary">{t.subHighlight}</span>
         </p>
 
-        {/* CTA */}
-        <button
-          onClick={onCta}
-          className="mt-2 px-6 py-3 rounded-md bg-accent hover:bg-accent-dark text-white font-medium text-base transition-colors cursor-pointer"
-        >
-          {t.cta}
-        </button>
+        <div className="flex items-center gap-2 ">
+
+          {/* CTA */}
+          <button
+            onClick={onCta}
+            className="px-6 py-3 rounded-md bg-accent hover:bg-accent-dark text-white font-medium text-base transition-colors cursor-pointer"
+          >
+            {t.cta}
+          </button>
+
+        </div>
+
 
         {/* Widget card */}
         <div className="mt-4 w-full max-w-2xl relative">
@@ -131,135 +150,135 @@ export default function Hero({ onCta, locale = "pt" }: HeroProps) {
               </p>
             </div>
 
-          <div className="rounded-lg border border-border bg-surface overflow-hidden">
-            {/* Browser chrome */}
-            <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border">
-              <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-              <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-              <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-              <span className="ml-3 text-xs text-secondary font-mono">
-                app.bugsniff.com.br/tickets/tkt_7f2a
-              </span>
-            </div>
-
-            <div className="p-5 space-y-5">
-
-              {/* 1 · Badge + Título + Status + Timestamp */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-mono text-muted bg-inset px-1.5 py-0.5 rounded border border-border">
-                    #tkt_7f2a
-                  </span>
-                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-error/10 border border-error/20 text-error">
-                    <span className="w-1 h-1 rounded-full bg-error animate-pulse" />
-                    {t.ticketStatus}
-                  </span>
-                </div>
-                <h3 className="text-sm font-semibold text-primary">{t.ticketTitle}</h3>
-                <p className="text-[10px] text-muted font-mono">
-                  {t.ticketMeta}
-                </p>
+            <div className="rounded-lg border border-border bg-surface overflow-hidden">
+              {/* Browser chrome */}
+              <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border">
+                <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
+                <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
+                <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
+                <span className="ml-3 text-xs text-secondary font-mono">
+                  app.bugsniff.com.br/tickets/tkt_7f2a
+                </span>
               </div>
 
-              {/* 2 · Replay placeholder */}
-              <div className="relative h-40 rounded-lg overflow-hidden bg-page border border-border">
-                {/* Atmosphere */}
-                <div className="absolute inset-0 bg-linear-to-br from-accent/10 via-transparent to-transparent pointer-events-none" />
+              <div className="p-5 space-y-5">
 
-                {/* Blurred frame thumbnails */}
-                <div className="absolute inset-0 flex items-center justify-center gap-4 pointer-events-none">
-                  <div className="w-24 h-16 rounded-md bg-surface border border-border/40 opacity-20" />
-                  <div className="w-32 h-20 rounded-md bg-surface border border-accent/30 opacity-30 ring-1 ring-accent/20 scale-105" />
-                  <div className="w-24 h-16 rounded-md bg-surface border border-border/40 opacity-20" />
-                </div>
-
-                {/* Top gradient */}
-                <div className="absolute inset-0 bg-linear-to-b from-page/50 via-transparent to-page/80 pointer-events-none" />
-
-                {/* Play button + label */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-surface/90 border border-border shadow-xl flex items-center justify-center">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-accent ml-1">
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-secondary font-medium">{t.replayLabel}</p>
-                    <p className="text-[10px] text-muted font-mono mt-0.5">
-                      {t.replayMeta}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Frame progress strip */}
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-                  {Array.from({ length: 14 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-1.5 h-1.5 rounded-full ${i < 9 ? "bg-accent/80" : i < 11 ? "bg-accent/30" : "bg-border-strong"
-                        }`}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* 3 · Timeline com handles */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.timelineLabel}</p>
-                <TicketTimeline activityData={ticketActivityData} />
-              </div>
-
-              {/* 4 · Logs */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.logsLabel}</p>
-                <div className="rounded-lg border border-border bg-inset overflow-hidden divide-y divide-border">
-                  {ticketLogStyles.map((style, i) => (
-                    <div key={i} className="flex items-baseline gap-3 px-3 py-2 text-[10px] font-mono">
-                      <span className="text-muted shrink-0 w-10">{style.t}</span>
-                      <span className={`${style.color} break-all`}>{t.ticketLogTexts[i]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 5 · Console */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.consoleLabel}</p>
-                <div className="rounded-lg overflow-hidden border border-border">
-                  {/* Terminal bar */}
-                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-hover bg-page-alt">
-                    <span className="w-2.5 h-2.5 rounded-full bg-error/40" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-warning/40" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-success/40" />
-                    <span className="ml-2 text-[9px] font-mono text-muted">
-                      console — seusite.com.br
+                {/* 1 · Badge + Título + Status + Timestamp */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-mono text-muted bg-inset px-1.5 py-0.5 rounded border border-border">
+                      #tkt_7f2a
+                    </span>
+                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-error/10 border border-error/20 text-error">
+                      <span className="w-1 h-1 rounded-full bg-error animate-pulse" />
+                      {t.ticketStatus}
                     </span>
                   </div>
+                  <h3 className="text-sm font-semibold text-primary">{t.ticketTitle}</h3>
+                  <p className="text-[10px] text-muted font-mono">
+                    {t.ticketMeta}
+                  </p>
+                </div>
 
-                  {/* Console body */}
-                  <div className="bg-[#050505] p-4 space-y-1 font-mono text-[10px] leading-relaxed">
-                    {consoleLogs.map((line, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        {/* Prefix column */}
-                        <span className="shrink-0 w-10 text-right">
-                          {line.prefix === "log"   && <span className="text-muted/50">▸</span>}
-                          {line.prefix === "warn"  && <span className="text-warning/70 text-[9px] font-bold">WARN</span>}
-                          {line.prefix === "error" && <span className="text-error/70 text-[9px] font-bold">ERR</span>}
-                        </span>
-                        <span className={line.cls}>{line.text}</span>
+                {/* 2 · Replay placeholder */}
+                <div className="relative h-40 rounded-lg overflow-hidden bg-page border border-border">
+                  {/* Atmosphere */}
+                  <div className="absolute inset-0 bg-linear-to-br from-accent/10 via-transparent to-transparent pointer-events-none" />
+
+                  {/* Blurred frame thumbnails */}
+                  <div className="absolute inset-0 flex items-center justify-center gap-4 pointer-events-none">
+                    <div className="w-24 h-16 rounded-md bg-surface border border-border/40 opacity-20" />
+                    <div className="w-32 h-20 rounded-md bg-surface border border-accent/30 opacity-30 ring-1 ring-accent/20 scale-105" />
+                    <div className="w-24 h-16 rounded-md bg-surface border border-border/40 opacity-20" />
+                  </div>
+
+                  {/* Top gradient */}
+                  <div className="absolute inset-0 bg-linear-to-b from-page/50 via-transparent to-page/80 pointer-events-none" />
+
+                  {/* Play button + label */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-surface/90 border border-border shadow-xl flex items-center justify-center">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-accent ml-1">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-secondary font-medium">{t.replayLabel}</p>
+                      <p className="text-[10px] text-muted font-mono mt-0.5">
+                        {t.replayMeta}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Frame progress strip */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                    {Array.from({ length: 14 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-1.5 h-1.5 rounded-full ${i < 9 ? "bg-accent/80" : i < 11 ? "bg-accent/30" : "bg-border-strong"
+                          }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3 · Timeline com handles */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.timelineLabel}</p>
+                  <TicketTimeline activityData={ticketActivityData} />
+                </div>
+
+                {/* 4 · Logs */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.logsLabel}</p>
+                  <div className="rounded-lg border border-border bg-inset overflow-hidden divide-y divide-border">
+                    {ticketLogStyles.map((style, i) => (
+                      <div key={i} className="flex items-baseline gap-3 px-3 py-2 text-[10px] font-mono">
+                        <span className="text-muted shrink-0 w-10">{style.t}</span>
+                        <span className={`${style.color} break-all`}>{t.ticketLogTexts[i]}</span>
                       </div>
                     ))}
-                    {/* Blinking cursor */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="w-10 text-right text-muted/40 shrink-0">$</span>
-                      <span className="inline-block w-2 h-[14px] bg-secondary/25 animate-pulse" />
+                  </div>
+                </div>
+
+                {/* 5 · Console */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.consoleLabel}</p>
+                  <div className="rounded-lg overflow-hidden border border-border">
+                    {/* Terminal bar */}
+                    <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-hover bg-page-alt">
+                      <span className="w-2.5 h-2.5 rounded-full bg-error/40" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-warning/40" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-success/40" />
+                      <span className="ml-2 text-[9px] font-mono text-muted">
+                        console — seusite.com.br
+                      </span>
+                    </div>
+
+                    {/* Console body */}
+                    <div className="bg-[#050505] p-4 space-y-1 font-mono text-[10px] leading-relaxed">
+                      {consoleLogs.map((line, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          {/* Prefix column */}
+                          <span className="shrink-0 w-10 text-right">
+                            {line.prefix === "log" && <span className="text-muted/50">▸</span>}
+                            {line.prefix === "warn" && <span className="text-warning/70 text-[9px] font-bold">WARN</span>}
+                            {line.prefix === "error" && <span className="text-error/70 text-[9px] font-bold">ERR</span>}
+                          </span>
+                          <span className={line.cls}>{line.text}</span>
+                        </div>
+                      ))}
+                      {/* Blinking cursor */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="w-10 text-right text-muted/40 shrink-0">$</span>
+                        <span className="inline-block w-2 h-[14px] bg-secondary/25 animate-pulse" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
+              </div>
             </div>
-          </div>
           </div>
         )}
       </div>

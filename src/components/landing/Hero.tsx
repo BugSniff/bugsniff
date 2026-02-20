@@ -50,7 +50,8 @@ export default function Hero({ onCta }: HeroProps) {
       {/* Nav */}
       <nav className="absolute top-0 left-0 right-0 flex items-center justify-between px-8 py-5 border-b border-border">
         <div className="flex items-center gap-2">
-          <BugIcon />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="BugSniff logo" className="h-6 w-auto" />
           <span className="font-geist text-primary font-semibold text-base tracking-tight">
             BugSniff
           </span>
@@ -338,28 +339,6 @@ function TicketTimeline({ activityData }: { activityData: number[] }) {
 
 /* ─── Icons ─────────────────────────────────────────────── */
 
-function BugIcon() {
-  return (
-    <svg
-      width="18" height="18" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round"
-      className="text-accent"
-    >
-      <path d="M8 2l1.88 1.88" />
-      <path d="M14.12 3.88 16 2" />
-      <path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" />
-      <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6" />
-      <path d="M12 20v-9" />
-      <path d="M6.53 9C4.6 8.8 3 7.1 3 5" />
-      <path d="M6 13H2" />
-      <path d="M3 21c0-2.1 1.7-3.9 4-4" />
-      <path d="M17.47 9c1.93-.2 3.53-1.9 3.53-4" />
-      <path d="M18 13h4" />
-      <path d="M21 21c0-2.1-1.7-3.9-4-4" />
-    </svg>
-  );
-}
 
 function CodeIcon() {
   return (

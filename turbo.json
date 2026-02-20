@@ -6,8 +6,13 @@
       "persistent": true
     },
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "apps/web/.next/**",
+        "!.next/cache/**"
+      ]
     },
     "lint": {}
   }

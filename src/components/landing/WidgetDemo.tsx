@@ -1,20 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
-type Step = "idle" | "open" | "recording" | "sending" | "done";
+type Step = "open" | "closed" | "sending" | "replaying" | "creating" | "ticketing";
 
-const timelineEvents = [
-  { icon: "↖", iconCls: "text-accent",    labelCls: "text-secondary", label: "Clique no checkout",           t: "00:41" },
-  { icon: "✕", iconCls: "text-error",     labelCls: "text-error",     label: "TypeError: Cannot read 'id'",  t: "00:42" },
-  { icon: "⇅", iconCls: "text-secondary", labelCls: "text-secondary", label: "POST /api/checkout 422",       t: "00:42" },
+const activityData = [
+  20, 35, 55, 30, 70, 45, 25, 60, 40, 80,
+  35, 50, 65, 20, 75, 45, 30, 55, 40, 70,
+  25, 60, 35, 80, 45, 55, 30, 65, 20, 75,
+  50, 35, 60, 45, 25, 70, 40, 55, 30, 65,
 ];
 
-export default function WidgetDemo() {
-  const [step, setStep] = useState<Step>("idle");
+const logEvents = [
+  { icon: "↖", iconCls: "text-accent", labelCls: "text-secondary", label: "Clique no checkout", t: "00:41" },
+  { icon: "✕", iconCls: "text-error", labelCls: "text-error", label: "TypeError: Cannot read 'id'", t: "00:42" },
+  { icon: "⇅", iconCls: "text-error", labelCls: "text-error", label: "POST /api/checkout 422", t: "00:42" },
+];
+
+interface WidgetDemoProps {
+  onTicketCreated?: () => void;
+}
+
+export default function WidgetDemo({ onTicketCreated }: WidgetDemoProps) {
+  const [step, setStep] = useState<Step>("open");
+  const isOpen = step !== "closed";
+
+  const toggle = () => setStep(s => (s === "closed" ? "open" : "closed"));
+
+  const handleSendReport = () => {
+    setStep("sending");
+    setTimeout(() => setStep("replaying"), 900);
+  };
+
+  const handleCreateTicket = () => {
+    setStep("creating");
+    setTimeout(() => {
+      setStep("ticketing");
+      onTicketCreated?.();
+    }, 1200);
+  };
 
   return (
-    <div className="relative rounded-md bg-page border border-border overflow-hidden select-none">
+    <div className="relative h-[380px] rounded-md overflow-hidden select-none border border-border bg-page">
       {/* Fake browser bar */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-page-alt">
         <span className="w-2 h-2 rounded-full bg-border-strong" />
@@ -23,146 +50,223 @@ export default function WidgetDemo() {
         <span className="ml-2 text-[9px] font-mono text-muted">seusite.com.br/checkout</span>
       </div>
 
-      {/* Fake page content */}
-      <div className="relative h-32">
-        <div className="p-3 space-y-1.5">
-          <div className="h-2 w-2/3 rounded bg-inset" />
-          <div className="h-2 w-1/2 rounded bg-inset" />
-          <div className="mt-2 flex gap-2">
-            <div className="h-5 flex-1 rounded bg-inset" />
-            <div className="h-5 w-12 rounded bg-surface-hover" />
-          </div>
-          <div className="h-2 w-3/4 rounded bg-inset" />
-          <div className="h-2 w-1/3 rounded bg-inset" />
+      {/* Fake page content — background skeleton */}
+      <div className="absolute inset-x-0 top-[29px] bottom-0 p-4 space-y-2 opacity-30 pointer-events-none">
+        <div className="h-3 w-1/3 rounded bg-inset" />
+        <div className="h-2 w-1/2 rounded bg-inset" />
+        <div className="h-2 w-2/5 rounded bg-inset" />
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="h-14 rounded bg-inset" />
+          <div className="h-14 rounded bg-inset" />
         </div>
+        <div className="h-2 w-3/4 rounded bg-inset" />
+        <div className="h-2 w-1/2 rounded bg-inset" />
+        <div className="mt-2 h-7 w-1/3 rounded bg-surface-hover" />
+      </div>
 
+      {/* Floating widget — bottom-right corner */}
+      <div className="absolute bottom-4 right-4 flex items-end gap-3">
         {/* Widget panel */}
-        {step !== "idle" && (
-          <div className="absolute inset-x-0 bottom-0 bg-surface border-t border-border rounded-t-lg shadow-xl animate-slide-up-widget">
-            {step === "done" ? (
-              <DoneState onReset={() => setStep("idle")} />
-            ) : (
-              <WidgetPanel step={step} onClose={() => setStep("idle")} onSend={() => { setStep("sending"); setTimeout(() => setStep("done"), 1400); }} setStep={setStep} />
-            )}
+        {isOpen && (
+          <div className="w-72 rounded-xl bg-surface border border-border shadow-2xl overflow-hidden animate-slide-up-widget">
+            {step === "open" && <OpenState onSend={handleSendReport} />}
+            {step === "sending" && <SendingState label="Capturando screenshots…" sub="montando replay silencioso" />}
+            {step === "replaying" && <ReplayingState onCreateTicket={handleCreateTicket} />}
+            {step === "creating" && <SendingState label="Criando ticket…" sub="anexando replay e logs" />}
+            {step === "ticketing" && <TicketingState />}
           </div>
         )}
 
-        {/* Floating widget button */}
-        {step === "idle" && (
+        {/* Toggle button + hint arrow */}
+        <div className="relative">
+          {/* Hint — only visible on initial state */}
+          {step === "closed" && (
+            <div className="absolute bottom-full right-0 mb-2 flex flex-col items-end gap-1 pointer-events-none animate-fade-in">
+              <span className="text-[9px] text-accent font-mono whitespace-nowrap bg-surface/90 px-2 py-1 rounded-md border border-border/60">
+                clique e simule o fluxo
+              </span>
+              <svg
+                className="text-accent animate-bounce mr-3"
+                width="12" height="12" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2.5"
+                strokeLinecap="round" strokeLinejoin="round"
+              >
+                <path d="M12 5v14M5 12l7 7 7-7" />
+              </svg>
+            </div>
+          )}
+
+          {/* Toggle button */}
           <button
-            onClick={() => setStep("open")}
-            className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-accent hover:bg-accent-dark flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer animate-pop-in"
-            title="Reportar bug"
+            onClick={toggle}
+            title={isOpen ? "Fechar widget" : "Abrir widget"}
+            className={`relative w-10 h-10 rounded-full flex items-center justify-center shadow-xl transition-all cursor-pointer ${isOpen
+              ? "bg-accent hover:bg-accent-dark"
+              : "bg-surface border border-border hover:border-accent"
+              }`}
           >
-            <BugIconSm />
-            <span className="absolute inset-0 rounded-full border border-accent animate-ping opacity-40" />
+            <BugIconSm color={isOpen ? "white" : "#a3a3a3"} />
+            {isOpen && (
+              <span className="absolute inset-0 rounded-full border border-accent animate-ping opacity-20" />
+            )}
           </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function WidgetPanel({
-  step,
-  onClose,
-  onSend,
-  setStep,
-}: {
-  step: Step;
-  onClose: () => void;
-  onSend: () => void;
-  setStep: (s: Step) => void;
-}) {
-  return (
-    <div className="px-3 py-2 space-y-2">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-error animate-pulse" />
-          <span className="text-[10px] font-medium text-primary">
-            {step === "recording" ? "Gravando…" : "BugSniff"}
-          </span>
         </div>
-        <button onClick={onClose} className="text-muted hover:text-secondary transition-colors cursor-pointer">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Timeline mini */}
-      <div className="space-y-1">
-        {timelineEvents.map((ev, i) => (
-          <div key={i} className="flex items-center gap-1.5 text-[9px] font-mono">
-            <span className={ev.iconCls}>{ev.icon}</span>
-            <span className="text-muted">{ev.t}</span>
-            <span className={`truncate ${ev.labelCls}`}>{ev.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-1.5 pt-0.5">
-        <button
-          onClick={() => setStep("recording")}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-[9px] font-medium border transition-colors cursor-pointer ${
-            step === "recording"
-              ? "bg-error/10 border-error/30 text-error"
-              : "bg-page border-border-strong text-secondary hover:border-accent hover:text-primary"
-          }`}
-        >
-          {step === "recording" ? (
-            <span className="w-1.5 h-1.5 rounded-sm bg-error" />
-          ) : (
-            <span className="text-[8px]">▶</span>
-          )}
-          {step === "recording" ? "Gravando" : "Replay"}
-        </button>
-
-        <button
-          onClick={onSend}
-          className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[9px] font-medium bg-accent hover:bg-accent-dark text-white transition-colors cursor-pointer"
-        >
-          {step === "sending" ? (
-            <svg className="animate-spin" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-          ) : (
-            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          )}
-          {step === "sending" ? "Enviando…" : "Enviar report"}
-        </button>
       </div>
     </div>
   );
 }
 
-function DoneState({ onReset }: { onReset: () => void }) {
+/* ─── States ─────────────────────────────────────────── */
+
+function OpenState({ onSend }: { onSend: () => void }) {
   return (
-    <div className="px-3 py-3 flex flex-col items-center gap-1.5 text-center">
-      <div className="w-6 h-6 rounded-full bg-success/15 border border-success/25 flex items-center justify-center">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-success">
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
+    <div className="px-4 py-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+        <span className="text-[11px] font-medium text-primary">BugSniff</span>
+        <span className="text-[10px] text-muted ml-0.5">— pronto para capturar</span>
       </div>
-      <p className="text-[10px] text-primary font-medium">Ticket criado!</p>
-      <p className="text-[9px] text-secondary font-mono">#tkt_7f2a — replay anexado</p>
+      <div className="rounded border border-border bg-inset px-3 py-2">
+        <p className="text-[10px] text-muted font-mono">
+          Ex: Botão não funciona ao fazer checkout…
+        </p>
+      </div>
       <button
-        onClick={onReset}
-        className="mt-0.5 text-[9px] text-muted hover:text-secondary transition-colors cursor-pointer underline underline-offset-2"
+        onClick={onSend}
+        className="w-full flex items-center justify-center gap-1.5 py-2 rounded text-[11px] font-medium bg-accent hover:bg-accent-dark text-white transition-colors cursor-pointer"
       >
-        Tentar de novo
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </svg>
+        Enviar report
       </button>
     </div>
   );
 }
 
-function BugIconSm() {
+function SendingState({ label, sub }: { label: string; sub: string }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div className="px-4 py-6 flex flex-col items-center gap-2 animate-fade-in">
+      <svg className="animate-spin text-accent" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+      </svg>
+      <p className="text-[10px] text-secondary">{label}</p>
+      <p className="text-[9px] text-muted">{sub}</p>
+    </div>
+  );
+}
+
+function ReplayingState({ onCreateTicket }: { onCreateTicket: () => void }) {
+  const [leftPct, setLeftPct] = useState(28);
+  const [rightPct, setRightPct] = useState(84);
+  const leftRef = useRef(28);
+  const rightRef = useRef(84);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef<"left" | "right" | null>(null);
+
+  const updateLeft = (v: number) => { leftRef.current = v; setLeftPct(v); };
+  const updateRight = (v: number) => { rightRef.current = v; setRightPct(v); };
+
+  const onHandleMouseDown = (handle: "left" | "right") => (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = handle;
+    const onMove = (ev: MouseEvent) => {
+      const rect = trackRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const pct = Math.max(0, Math.min(100, ((ev.clientX - rect.left) / rect.width) * 100));
+      if (dragging.current === "left") updateLeft(Math.min(pct, rightRef.current - 8));
+      else updateRight(Math.max(pct, leftRef.current + 8));
+    };
+    const onUp = () => {
+      dragging.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  return (
+    <div className="px-4 py-3 space-y-3 animate-fade-in">
+      <div className="flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-success" />
+        <span className="text-[11px] font-medium text-primary">Replay capturado</span>
+        <span className="ml-auto text-[9px] text-muted font-mono">silencioso · 42 frames</span>
+      </div>
+
+      {/* Timeline */}
+      <div className="space-y-1">
+        <p className="text-[9px] font-mono text-muted uppercase tracking-widest">Timeline</p>
+        <div ref={trackRef} className="relative h-11 rounded overflow-hidden bg-inset cursor-ew-resize">
+          <div className="absolute inset-0 flex items-end gap-px pb-px px-px pointer-events-none">
+            {activityData.map((h, i) => (
+              <div key={i} className="flex-1 rounded-t-sm bg-border-strong" style={{ height: `${h}%` }} />
+            ))}
+          </div>
+          <div className="absolute inset-y-0 left-0 bg-page/55 pointer-events-none" style={{ width: `${leftPct}%` }} />
+          <div className="absolute inset-y-0 right-0 bg-page/55 pointer-events-none" style={{ left: `${rightPct}%` }} />
+          <div className="absolute inset-y-0 bg-accent/15 pointer-events-none" style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }} />
+          <div className="absolute inset-y-0 w-[2px] bg-accent z-10 cursor-ew-resize" style={{ left: `${leftPct}%` }} onMouseDown={onHandleMouseDown("left")}>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-b" />
+          </div>
+          <div className="absolute inset-y-0 w-[2px] bg-accent z-10 cursor-ew-resize" style={{ left: `${rightPct}%` }} onMouseDown={onHandleMouseDown("right")}>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-b" />
+          </div>
+        </div>
+        <div className="flex justify-between text-[8px] font-mono text-muted">
+          <span>00:00</span><span>00:14</span><span>00:28</span><span>00:42</span>
+        </div>
+      </div>
+
+      {/* Logs */}
+      <div className="space-y-1">
+        <p className="text-[9px] font-mono text-muted uppercase tracking-widest">Logs</p>
+        <div className="rounded border border-border bg-inset divide-y divide-border">
+          {logEvents.map((ev, i) => (
+            <div key={i} className="flex items-center gap-2 px-2 py-1.5 text-[9px] font-mono">
+              <span className={ev.iconCls}>{ev.icon}</span>
+              <span className="text-muted w-8 shrink-0">{ev.t}</span>
+              <span className={`truncate ${ev.labelCls}`}>{ev.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Create ticket */}
+      <div className="flex gap-2">
+        <div className="flex-1 min-w-0 rounded border border-border bg-inset px-2.5 py-1.5 text-[10px] font-mono text-secondary truncate">
+          Página de Checkout
+        </div>
+        <button
+          onClick={onCreateTicket}
+          className="px-3 py-1.5 rounded text-[10px] font-medium bg-accent hover:bg-accent-dark text-white transition-colors cursor-pointer shrink-0"
+        >
+          Enviar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TicketingState() {
+  return (
+    <div className="px-4 py-5 flex flex-col items-center gap-2 text-center animate-fade-in">
+      <div className="w-7 h-7 rounded-full bg-success/15 border border-success/25 flex items-center justify-center">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-success">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </div>
+      <p className="text-[11px] text-primary font-medium">Ticket criado!</p>
+      <p className="text-[10px] text-secondary font-mono">#tkt_7f2a · Página de Checkout</p>
+      <p className="text-[9px] text-muted">Replay silencioso anexado automaticamente</p>
+    </div>
+  );
+}
+
+function BugIconSm({ color = "white" }: { color?: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8 2l1.88 1.88" />
       <path d="M14.12 3.88 16 2" />
       <path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" />

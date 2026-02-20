@@ -1,10 +1,48 @@
+"use client";
+
+import { useState, useRef } from "react";
 import WidgetDemo from "./WidgetDemo";
+
+/* ─── Data ──────────────────────────────────────────────── */
+
+const ticketActivityData = [
+  15, 40, 60, 25, 75, 50, 30, 65, 35, 85,
+  40, 55, 70, 25, 80, 50, 35, 60, 45, 75,
+  20, 65, 40, 85, 50, 60, 35, 70, 25, 80,
+  55, 40, 65, 50, 30, 75, 45, 60, 35, 70,
+];
+
+const ticketLogs = [
+  { t: "00:38", color: "text-secondary", text: "→  Navegou para /checkout" },
+  { t: "00:41", color: "text-accent",    text: "↖  Clique em 'Finalizar compra'" },
+  { t: "00:41", color: "text-success",   text: "⇅  GET /api/user · 200 OK" },
+  { t: "00:41", color: "text-success",   text: "⇅  GET /api/cart · 200 OK" },
+  { t: "00:42", color: "text-warning",   text: "⇅  POST /api/apply-coupon · 206 Partial" },
+  { t: "00:42", color: "text-error",     text: "⇅  POST /api/checkout · 422 Unprocessable" },
+  { t: "00:42", color: "text-error",     text: "✕  TypeError: Cannot read properties of undefined (reading 'id')" },
+  { t: "00:42", color: "text-error",     text: "✕  Uncaught error in event handler" },
+];
+
+const consoleLogs: { prefix: string | null; cls: string; text: string }[] = [
+  { prefix: "log",   cls: "text-secondary/60", text: "Cart loaded  {items: 3, total: 249.90}" },
+  { prefix: "log",   cls: "text-secondary/60", text: "Applying coupon code PROMO10..." },
+  { prefix: "log",   cls: "text-secondary/60", text: "Initiating checkout..." },
+  { prefix: "warn",  cls: "text-warning",      text: "Missing required field: billing.address" },
+  { prefix: "error", cls: "text-error",        text: "TypeError: Cannot read properties of undefined (reading 'id')" },
+  { prefix: null,    cls: "text-error/50",     text: "    at CheckoutForm.handleSubmit (checkout.js:142:18)" },
+  { prefix: null,    cls: "text-error/50",     text: "    at HTMLButtonElement.onClick (checkout.js:89:5)" },
+  { prefix: null,    cls: "text-error/50",     text: "    at EventTarget.dispatchEvent (native)" },
+];
+
+/* ─── Hero ──────────────────────────────────────────────── */
 
 interface HeroProps {
   onCta: () => void;
 }
 
 export default function Hero({ onCta }: HeroProps) {
+  const [ticketCreated, setTicketCreated] = useState(false);
+
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-16 overflow-hidden bg-dot-grid">
       <div className="absolute inset-0 bg-linear-to-b from-page via-transparent to-page pointer-events-none" />
@@ -54,120 +92,235 @@ export default function Hero({ onCta }: HeroProps) {
           Quero acesso antecipado
         </button>
 
-        {/* Two path cards */}
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl relative">
+        {/* Widget card */}
+        <div className="mt-4 w-full max-w-2xl relative">
           <div className="absolute inset-0 -z-10 blur-3xl opacity-20 bg-accent rounded-3xl" />
-
-          {/* Card: Para seu site */}
           <div className="rounded-lg border border-border bg-surface p-5 text-left flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <CodeIcon />
               <span className="text-sm font-medium text-primary">Para seu site</span>
             </div>
-            <WidgetDemo />
+            <WidgetDemo onTicketCreated={() => setTicketCreated(true)} />
             <p className="text-xs text-secondary">
-              Clique no botão azul para ver o widget em ação — seus visitantes
-              reportam sem instalar nada.
-            </p>
-          </div>
-
-          {/* Card: Para seus testers */}
-          <div className="rounded-lg border border-border bg-surface p-5 text-left flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <ExtensionIcon />
-              <span className="text-sm font-medium text-primary">Para seus testers</span>
-            </div>
-            <div className="bg-page rounded px-3 py-2 border border-border">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full bg-error animate-pulse" />
-                <span className="text-xs text-secondary font-mono">
-                  Gravando — bugsniff.com.br
-                </span>
-              </div>
-              <div className="text-xs text-secondary space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-accent">●</span>
-                  <span className="font-mono">POST /api/checkout 422</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-error">✕</span>
-                  <span className="font-mono">TypeError: Cannot read &apos;id&apos;</span>
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-secondary">
-              API key no popup — timeline completa com rrweb, network e console.
+              Simule o fluxo completo — clique em{" "}
+              <span className="text-primary font-medium">Enviar report</span> no widget e veja
+              como um bug vira ticket com replay e logs em segundos.
             </p>
           </div>
         </div>
 
-        {/* Dashboard mockup hint */}
-        <div className="w-full max-w-2xl rounded-lg border border-border bg-surface overflow-hidden">
-          <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border">
-            <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-            <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-            <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
-            <span className="ml-3 text-xs text-secondary font-mono">
-              app.bugsniff.com.br/tickets/tkt_7f2a
-            </span>
-          </div>
-          <div className="p-4 grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-2">
-              <div className="h-32 rounded bg-page border border-border flex items-center justify-center">
-                <div className="text-center space-y-1">
-                  <div className="text-xs text-secondary">▶ Replay</div>
-                  <div className="text-xs font-mono text-accent">00:42 / 02:15</div>
+        {/* ── Ticket view — aparece após criar ticket ── */}
+        {ticketCreated && (
+          <div className="w-full max-w-2xl rounded-lg border border-border bg-surface overflow-hidden animate-slide-up-widget">
+            {/* Browser chrome */}
+            <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border">
+              <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
+              <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
+              <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
+              <span className="ml-3 text-xs text-secondary font-mono">
+                app.bugsniff.com.br/tickets/tkt_7f2a
+              </span>
+            </div>
+
+            <div className="p-5 space-y-5">
+
+              {/* 1 · Badge + Título + Status + Timestamp */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-mono text-muted bg-inset px-1.5 py-0.5 rounded border border-border">
+                    #tkt_7f2a
+                  </span>
+                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-error/10 border border-error/20 text-error">
+                    <span className="w-1 h-1 rounded-full bg-error animate-pulse" />
+                    aberto
+                  </span>
+                </div>
+                <h3 className="text-sm font-semibold text-primary">Página de Checkout</h3>
+                <p className="text-[10px] text-muted font-mono">
+                  20 de fev. de 2026 às 14:32:07 · via BugSniff widget · seusite.com.br
+                </p>
+              </div>
+
+              {/* 2 · Replay placeholder */}
+              <div className="relative h-40 rounded-lg overflow-hidden bg-page border border-border">
+                {/* Atmosphere */}
+                <div className="absolute inset-0 bg-linear-to-br from-accent/10 via-transparent to-transparent pointer-events-none" />
+
+                {/* Blurred frame thumbnails */}
+                <div className="absolute inset-0 flex items-center justify-center gap-4 pointer-events-none">
+                  <div className="w-24 h-16 rounded-md bg-surface border border-border/40 opacity-20" />
+                  <div className="w-32 h-20 rounded-md bg-surface border border-accent/30 opacity-30 ring-1 ring-accent/20 scale-105" />
+                  <div className="w-24 h-16 rounded-md bg-surface border border-border/40 opacity-20" />
+                </div>
+
+                {/* Top gradient */}
+                <div className="absolute inset-0 bg-linear-to-b from-page/50 via-transparent to-page/80 pointer-events-none" />
+
+                {/* Play button + label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-surface/90 border border-border shadow-xl flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-accent ml-1">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-secondary font-medium">Replay da sessão</p>
+                    <p className="text-[10px] text-muted font-mono mt-0.5">
+                      42 frames · 00:42 · silencioso
+                    </p>
+                  </div>
+                </div>
+
+                {/* Frame progress strip */}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                  {Array.from({ length: 14 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        i < 9 ? "bg-accent/80" : i < 11 ? "bg-accent/30" : "bg-border-strong"
+                      }`}
+                    />
+                  ))}
                 </div>
               </div>
-              <div className="h-12 rounded bg-page border border-border flex items-center px-3 gap-2 overflow-hidden">
-                {[
-                  { cls: "bg-accent", height: 14 },
-                  { cls: "bg-secondary", height: 22 },
-                  { cls: "bg-accent", height: 10 },
-                  { cls: "bg-error", height: 20 },
-                  { cls: "bg-secondary", height: 16 },
-                  { cls: "bg-accent", height: 18 },
-                ].map((bar, i) => (
-                  <span
-                    key={i}
-                    className={`w-1 rounded-full shrink-0 ${bar.cls}`}
-                    style={{ height: `${bar.height}px` }}
-                  />
-                ))}
-                <span className="text-[10px] text-secondary ml-1 font-mono">Timeline</span>
+
+              {/* 3 · Timeline com handles */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Timeline</p>
+                <TicketTimeline activityData={ticketActivityData} />
               </div>
-            </div>
-            <div className="space-y-2">
-              <div className="rounded bg-page border border-border p-2">
-                <div className="text-[10px] text-secondary mb-1">Network</div>
-                <div className="space-y-1">
-                  {[
-                    { method: "GET", path: "/api/user", status: "200" },
-                    { method: "POST", path: "/api/checkout", status: "422" },
-                  ].map((r, i) => (
-                    <div key={i} className="flex items-center gap-1">
-                      <span className="text-[9px] font-mono text-secondary">{r.method}</span>
-                      <span className="text-[9px] font-mono text-primary truncate flex-1">{r.path}</span>
-                      <span className={`text-[9px] font-mono ${r.status.startsWith("2") ? "text-success" : "text-error"}`}>
-                        {r.status}
-                      </span>
+
+              {/* 4 · Logs */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Logs</p>
+                <div className="rounded-lg border border-border bg-inset overflow-hidden divide-y divide-border">
+                  {ticketLogs.map((log, i) => (
+                    <div key={i} className="flex items-baseline gap-3 px-3 py-2 text-[10px] font-mono">
+                      <span className="text-muted shrink-0 w-10">{log.t}</span>
+                      <span className={`${log.color} break-all`}>{log.text}</span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="rounded bg-page border border-border p-2">
-                <div className="text-[10px] text-secondary mb-1">Console</div>
-                <div className="text-[9px] font-mono text-error">
-                  TypeError: Cannot read properties of undefined
+
+              {/* 5 · Console */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Console</p>
+                <div className="rounded-lg overflow-hidden border border-border">
+                  {/* Terminal bar */}
+                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-hover bg-page-alt">
+                    <span className="w-2.5 h-2.5 rounded-full bg-error/40" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-warning/40" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-success/40" />
+                    <span className="ml-2 text-[9px] font-mono text-muted">
+                      console — seusite.com.br
+                    </span>
+                  </div>
+
+                  {/* Console body */}
+                  <div className="bg-[#050505] p-4 space-y-1 font-mono text-[10px] leading-relaxed">
+                    {consoleLogs.map((line, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        {/* Prefix column */}
+                        <span className="shrink-0 w-10 text-right">
+                          {line.prefix === "log"   && <span className="text-muted/50">▸</span>}
+                          {line.prefix === "warn"  && <span className="text-warning/70 text-[9px] font-bold">WARN</span>}
+                          {line.prefix === "error" && <span className="text-error/70 text-[9px] font-bold">ERR</span>}
+                        </span>
+                        <span className={line.cls}>{line.text}</span>
+                      </div>
+                    ))}
+                    {/* Blinking cursor */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="w-10 text-right text-muted/40 shrink-0">$</span>
+                      <span className="inline-block w-2 h-[14px] bg-secondary/25 animate-pulse" />
+                    </div>
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );
 }
+
+/* ─── TicketTimeline ────────────────────────────────────── */
+
+function TicketTimeline({ activityData }: { activityData: number[] }) {
+  const [leftPct, setLeftPct]   = useState(28);
+  const [rightPct, setRightPct] = useState(84);
+  const leftRef  = useRef(28);
+  const rightRef = useRef(84);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef<"left" | "right" | null>(null);
+
+  const updateLeft  = (v: number) => { leftRef.current  = v; setLeftPct(v); };
+  const updateRight = (v: number) => { rightRef.current = v; setRightPct(v); };
+
+  const onHandleMouseDown = (handle: "left" | "right") => (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = handle;
+    const onMove = (ev: MouseEvent) => {
+      const rect = trackRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const pct = Math.max(0, Math.min(100, ((ev.clientX - rect.left) / rect.width) * 100));
+      if (dragging.current === "left") updateLeft(Math.min(pct, rightRef.current - 8));
+      else updateRight(Math.max(pct, leftRef.current + 8));
+    };
+    const onUp = () => {
+      dragging.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div ref={trackRef} className="relative h-12 rounded-lg overflow-hidden bg-page border border-border cursor-ew-resize">
+        {/* Activity bars */}
+        <div className="absolute inset-0 flex items-end gap-px pb-px px-px pointer-events-none">
+          {activityData.map((h, i) => (
+            <div key={i} className="flex-1 rounded-t-sm bg-border-strong" style={{ height: `${h}%` }} />
+          ))}
+        </div>
+        {/* Dim overlays */}
+        <div className="absolute inset-y-0 left-0 bg-page/60 pointer-events-none" style={{ width: `${leftPct}%` }} />
+        <div className="absolute inset-y-0 right-0 bg-page/60 pointer-events-none" style={{ left: `${rightPct}%` }} />
+        {/* Selected tint */}
+        <div className="absolute inset-y-0 bg-accent/15 pointer-events-none" style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }} />
+        {/* Left handle */}
+        <div
+          className="absolute inset-y-0 w-[2px] bg-accent z-10 cursor-ew-resize"
+          style={{ left: `${leftPct}%` }}
+          onMouseDown={onHandleMouseDown("left")}
+        >
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-b" />
+        </div>
+        {/* Right handle */}
+        <div
+          className="absolute inset-y-0 w-[2px] bg-accent z-10 cursor-ew-resize"
+          style={{ left: `${rightPct}%` }}
+          onMouseDown={onHandleMouseDown("right")}
+        >
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-b" />
+        </div>
+      </div>
+      <div className="flex justify-between text-[9px] font-mono text-muted">
+        <span>00:00</span>
+        <span>00:14</span>
+        <span>00:28</span>
+        <span>00:42</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Icons ─────────────────────────────────────────────── */
 
 function BugIcon() {
   return (
@@ -202,21 +355,6 @@ function CodeIcon() {
     >
       <polyline points="16 18 22 12 16 6" />
       <polyline points="8 6 2 12 8 18" />
-    </svg>
-  );
-}
-
-function ExtensionIcon() {
-  return (
-    <svg
-      width="14" height="14" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round"
-      className="text-accent"
-    >
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-      <line x1="12" y1="22.08" x2="12" y2="12" />
     </svg>
   );
 }

@@ -1,3 +1,5 @@
+import { content, type Locale } from "@/lib/content";
+
 const networkLogs = [
   { method: "GET",  path: "/api/user",     status: "200", time: "42ms" },
   { method: "GET",  path: "/api/cart",     status: "200", time: "67ms" },
@@ -12,14 +14,6 @@ const consoleLogs = [
   { type: "error", msg: "Unhandled Promise Rejection: checkout failed" },
 ];
 
-const timelineEvents = [
-  { type: "click",   label: "Clique em 'Finalizar compra'", t: "00:38" },
-  { type: "network", label: "POST /api/checkout → 422",      t: "00:39" },
-  { type: "error",   label: "TypeError: Cannot read 'id'",   t: "00:39" },
-  { type: "network", label: "GET /api/payment → 500",        t: "00:40" },
-  { type: "click",   label: "Clique em 'Tentar novamente'",  t: "00:42" },
-];
-
 const typeIconCls: Record<string, { icon: string; textCls: string }> = {
   click:   { icon: "↖", textCls: "text-accent" },
   network: { icon: "⇅", textCls: "text-secondary" },
@@ -32,17 +26,22 @@ const consoleTypeCls: Record<string, string> = {
   error: "text-error",
 };
 
-export default function DashboardPreview() {
+interface DashboardPreviewProps {
+  locale?: Locale;
+}
+
+export default function DashboardPreview({ locale = "pt" }: DashboardPreviewProps) {
+  const t = content[locale].dashboard;
+
   return (
     <section className="py-24 px-6 border-t border-border">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="font-geist text-3xl sm:text-4xl font-bold text-primary mb-4">
-            O que chega no dashboard
+            {t.title}
           </h2>
           <p className="text-secondary text-base max-w-xl mx-auto">
-            Cada ticket tem tudo que o dev precisa para reproduzir e corrigir —
-            sem perguntar mais nada.
+            {t.subtitle}
           </p>
         </div>
 
@@ -54,7 +53,7 @@ export default function DashboardPreview() {
             <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
             <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
             <span className="ml-3 text-xs text-secondary font-mono">
-              Checkout quebrado após seleção de endereço
+              {t.ticketTitle}
             </span>
             <span className="ml-auto text-[10px] px-2 py-0.5 rounded bg-error/10 text-error border border-error/20 font-mono">
               open
@@ -67,7 +66,7 @@ export default function DashboardPreview() {
               {/* Replay player */}
               <div>
                 <div className="text-[10px] text-secondary mb-2 font-mono uppercase tracking-wider">
-                  Replay
+                  {t.replayLabel}
                 </div>
                 <div className="rounded-lg bg-page border border-border h-40 flex items-center justify-center relative overflow-hidden">
                   <div className="absolute inset-0 flex flex-col">
@@ -103,10 +102,10 @@ export default function DashboardPreview() {
               {/* Timeline */}
               <div>
                 <div className="text-[10px] text-secondary mb-2 font-mono uppercase tracking-wider">
-                  Timeline de eventos
+                  {t.timelineLabel}
                 </div>
                 <div className="space-y-1.5">
-                  {timelineEvents.map((ev, i) => {
+                  {t.timelineEvents.map((ev, i) => {
                     const { icon, textCls } = typeIconCls[ev.type];
                     const isError = ev.type === "error";
                     return (
@@ -135,7 +134,7 @@ export default function DashboardPreview() {
               {/* Network */}
               <div className="p-4">
                 <div className="text-[10px] text-secondary mb-2 font-mono uppercase tracking-wider">
-                  Network logs
+                  {t.networkLabel}
                 </div>
                 <div className="space-y-1.5">
                   {networkLogs.map((r, i) => (
@@ -154,7 +153,7 @@ export default function DashboardPreview() {
               {/* Console */}
               <div className="p-4">
                 <div className="text-[10px] text-secondary mb-2 font-mono uppercase tracking-wider">
-                  Console logs
+                  {t.consoleLabel}
                 </div>
                 <div className="space-y-1.5">
                   {consoleLogs.map((l, i) => {
@@ -172,15 +171,10 @@ export default function DashboardPreview() {
               {/* Metadata */}
               <div className="p-4">
                 <div className="text-[10px] text-secondary mb-2 font-mono uppercase tracking-wider">
-                  Metadata
+                  {t.metaLabel}
                 </div>
                 <div className="space-y-1">
-                  {[
-                    ["Browser",   "Chrome 131 / macOS 14"],
-                    ["Viewport",  "1440 × 900"],
-                    ["URL",       "/checkout?step=2"],
-                    ["Reportado", "há 3 minutos"],
-                  ].map(([k, v]) => (
+                  {t.metaRows.map(([k, v]) => (
                     <div key={k} className="flex items-center gap-2 text-[10px]">
                       <span className="text-secondary shrink-0 w-16 font-mono">{k}</span>
                       <span className="text-primary font-mono">{v}</span>

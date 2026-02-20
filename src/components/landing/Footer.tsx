@@ -1,8 +1,13 @@
+import { content, type Locale } from "@/lib/content";
+
 interface FooterProps {
   onCta: () => void;
+  locale?: Locale;
 }
 
-export default function Footer({ onCta }: FooterProps) {
+export default function Footer({ onCta, locale = "pt" }: FooterProps) {
+  const t = content[locale].footer;
+
   return (
     <footer className="py-10 px-6 border-t border-border">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -13,16 +18,16 @@ export default function Footer({ onCta }: FooterProps) {
         </div>
         <div className="flex items-center gap-6 text-xs text-secondary">
           <a
-            href="mailto:contato@bugsniff.com.br"
+            href={`mailto:${t.email}`}
             className="hover:text-primary transition-colors"
           >
-            contato@bugsniff.com.br
+            {t.email}
           </a>
           <button
             onClick={onCta}
             className="hover:text-primary transition-colors cursor-pointer"
           >
-            Lista de espera
+            {t.waitlist}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import WidgetDemo from "./WidgetDemo";
+import { content, type Locale } from "@/lib/content";
 
 /* ─── Data ──────────────────────────────────────────────── */
 
@@ -12,35 +13,37 @@ const ticketActivityData = [
   55, 40, 65, 50, 30, 75, 45, 60, 35, 70,
 ];
 
-const ticketLogs = [
-  { t: "00:38", color: "text-secondary", text: "→  Navegou para /checkout" },
-  { t: "00:41", color: "text-accent", text: "↖  Clique em 'Finalizar compra'" },
-  { t: "00:41", color: "text-success", text: "⇅  GET /api/user · 200 OK" },
-  { t: "00:41", color: "text-success", text: "⇅  GET /api/cart · 200 OK" },
-  { t: "00:42", color: "text-warning", text: "⇅  POST /api/apply-coupon · 206 Partial" },
-  { t: "00:42", color: "text-error", text: "⇅  POST /api/checkout · 422 Unprocessable" },
-  { t: "00:42", color: "text-error", text: "✕  TypeError: Cannot read properties of undefined (reading 'id')" },
-  { t: "00:42", color: "text-error", text: "✕  Uncaught error in event handler" },
+const ticketLogStyles = [
+  { t: "00:38", color: "text-secondary" },
+  { t: "00:41", color: "text-accent" },
+  { t: "00:41", color: "text-success" },
+  { t: "00:41", color: "text-success" },
+  { t: "00:42", color: "text-warning" },
+  { t: "00:42", color: "text-error" },
+  { t: "00:42", color: "text-error" },
+  { t: "00:42", color: "text-error" },
 ];
 
 const consoleLogs: { prefix: string | null; cls: string; text: string }[] = [
-  { prefix: "log", cls: "text-secondary/60", text: "Cart loaded  {items: 3, total: 249.90}" },
-  { prefix: "log", cls: "text-secondary/60", text: "Applying coupon code PROMO10..." },
-  { prefix: "log", cls: "text-secondary/60", text: "Initiating checkout..." },
-  { prefix: "warn", cls: "text-warning", text: "Missing required field: billing.address" },
-  { prefix: "error", cls: "text-error", text: "TypeError: Cannot read properties of undefined (reading 'id')" },
-  { prefix: null, cls: "text-error/50", text: "    at CheckoutForm.handleSubmit (checkout.js:142:18)" },
-  { prefix: null, cls: "text-error/50", text: "    at HTMLButtonElement.onClick (checkout.js:89:5)" },
-  { prefix: null, cls: "text-error/50", text: "    at EventTarget.dispatchEvent (native)" },
+  { prefix: "log",   cls: "text-secondary/60", text: "Cart loaded  {items: 3, total: 249.90}" },
+  { prefix: "log",   cls: "text-secondary/60", text: "Applying coupon code PROMO10..." },
+  { prefix: "log",   cls: "text-secondary/60", text: "Initiating checkout..." },
+  { prefix: "warn",  cls: "text-warning",       text: "Missing required field: billing.address" },
+  { prefix: "error", cls: "text-error",         text: "TypeError: Cannot read properties of undefined (reading 'id')" },
+  { prefix: null,    cls: "text-error/50",      text: "    at CheckoutForm.handleSubmit (checkout.js:142:18)" },
+  { prefix: null,    cls: "text-error/50",      text: "    at HTMLButtonElement.onClick (checkout.js:89:5)" },
+  { prefix: null,    cls: "text-error/50",      text: "    at EventTarget.dispatchEvent (native)" },
 ];
 
 /* ─── Hero ──────────────────────────────────────────────── */
 
 interface HeroProps {
   onCta: () => void;
+  locale?: Locale;
 }
 
-export default function Hero({ onCta }: HeroProps) {
+export default function Hero({ onCta, locale = "pt" }: HeroProps) {
+  const t = content[locale].hero;
   const [ticketCreated, setTicketCreated] = useState(false);
 
   return (
@@ -60,7 +63,7 @@ export default function Hero({ onCta }: HeroProps) {
           onClick={onCta}
           className="text-sm text-secondary hover:text-primary transition-colors cursor-pointer"
         >
-          Entrar na lista →
+          {t.navCta}
         </button>
       </nav>
 
@@ -68,21 +71,20 @@ export default function Hero({ onCta }: HeroProps) {
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-surface text-xs text-secondary">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-          Em desenvolvimento — entre na lista de espera
+          {t.badge}
         </div>
 
         {/* Headline */}
         <h1 className="font-geist text-5xl sm:text-6xl font-bold tracking-tight text-primary leading-[1.1]">
-          Seu usuário achou o bug.
+          {t.h1Line1}
           <br />
-          <span className="text-accent">Você recebe o replay.</span>
+          <span className="text-accent">{t.h1Line2}</span>
         </h1>
 
         {/* Subheadline */}
         <p className="text-lg sm:text-xl text-secondary max-w-xl leading-relaxed">
-          Cole um script no seu SaaS em 30 segundos. Cada report chega com Replay da Interação do seu usuário,
-          sessão gravada, logs de rede e console —{" "}
-          <span className="text-primary">sem ida e volta.</span>
+          {t.sub}{" "}
+          <span className="text-primary">{t.subHighlight}</span>
         </p>
 
         {/* CTA */}
@@ -90,7 +92,7 @@ export default function Hero({ onCta }: HeroProps) {
           onClick={onCta}
           className="mt-2 px-6 py-3 rounded-md bg-accent hover:bg-accent-dark text-white font-medium text-base transition-colors cursor-pointer"
         >
-          Quero acesso antecipado
+          {t.cta}
         </button>
 
         {/* Widget card */}
@@ -99,16 +101,17 @@ export default function Hero({ onCta }: HeroProps) {
           <div className="rounded-lg border border-border bg-surface p-5 text-left flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <CodeIcon />
-              <span className="text-sm font-medium text-primary">Para seu site</span>
+              <span className="text-sm font-medium text-primary">{t.widgetCardLabel}</span>
             </div>
             <WidgetDemo
+              locale={locale}
               onTicketCreated={() => setTicketCreated(true)}
               onClose={() => setTicketCreated(false)}
             />
             <p className="text-xs text-secondary">
-              Simule o fluxo completo — clique em{" "}
-              <span className="text-primary font-medium">Enviar report</span> no widget e veja
-              como um bug vira ticket com replay e logs em segundos.
+              {t.widgetDesc}{" "}
+              <span className="text-primary font-medium">{t.widgetDescBold}</span>{" "}
+              {t.widgetDescSuffix}
             </p>
           </div>
         </div>
@@ -123,8 +126,8 @@ export default function Hero({ onCta }: HeroProps) {
                 <circle cx="12" cy="12" r="3" />
               </svg>
               <p className="text-xs text-secondary">
-                É assim que vai ficar seu ticket no{" "}
-                <span className="text-primary font-medium">dashboard</span>
+                {t.ticketEyebrow}{" "}
+                <span className="text-primary font-medium">{t.ticketEyebrowBold}</span>
               </p>
             </div>
 
@@ -149,12 +152,12 @@ export default function Hero({ onCta }: HeroProps) {
                   </span>
                   <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-error/10 border border-error/20 text-error">
                     <span className="w-1 h-1 rounded-full bg-error animate-pulse" />
-                    aberto
+                    {t.ticketStatus}
                   </span>
                 </div>
-                <h3 className="text-sm font-semibold text-primary">Página de Checkout</h3>
+                <h3 className="text-sm font-semibold text-primary">{t.ticketTitle}</h3>
                 <p className="text-[10px] text-muted font-mono">
-                  20 de fev. de 2026 às 14:32:07 · via BugSniff widget · seusite.com.br
+                  {t.ticketMeta}
                 </p>
               </div>
 
@@ -181,9 +184,9 @@ export default function Hero({ onCta }: HeroProps) {
                     </svg>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-secondary font-medium">Replay da sessão</p>
+                    <p className="text-xs text-secondary font-medium">{t.replayLabel}</p>
                     <p className="text-[10px] text-muted font-mono mt-0.5">
-                      42 frames · 00:42 · silencioso
+                      {t.replayMeta}
                     </p>
                   </div>
                 </div>
@@ -202,18 +205,18 @@ export default function Hero({ onCta }: HeroProps) {
 
               {/* 3 · Timeline com handles */}
               <div className="space-y-2">
-                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Timeline</p>
+                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.timelineLabel}</p>
                 <TicketTimeline activityData={ticketActivityData} />
               </div>
 
               {/* 4 · Logs */}
               <div className="space-y-2">
-                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Logs</p>
+                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.logsLabel}</p>
                 <div className="rounded-lg border border-border bg-inset overflow-hidden divide-y divide-border">
-                  {ticketLogs.map((log, i) => (
+                  {ticketLogStyles.map((style, i) => (
                     <div key={i} className="flex items-baseline gap-3 px-3 py-2 text-[10px] font-mono">
-                      <span className="text-muted shrink-0 w-10">{log.t}</span>
-                      <span className={`${log.color} break-all`}>{log.text}</span>
+                      <span className="text-muted shrink-0 w-10">{style.t}</span>
+                      <span className={`${style.color} break-all`}>{t.ticketLogTexts[i]}</span>
                     </div>
                   ))}
                 </div>
@@ -221,7 +224,7 @@ export default function Hero({ onCta }: HeroProps) {
 
               {/* 5 · Console */}
               <div className="space-y-2">
-                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Console</p>
+                <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{t.consoleLabel}</p>
                 <div className="rounded-lg overflow-hidden border border-border">
                   {/* Terminal bar */}
                   <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-hover bg-page-alt">
@@ -239,8 +242,8 @@ export default function Hero({ onCta }: HeroProps) {
                       <div key={i} className="flex items-start gap-3">
                         {/* Prefix column */}
                         <span className="shrink-0 w-10 text-right">
-                          {line.prefix === "log" && <span className="text-muted/50">▸</span>}
-                          {line.prefix === "warn" && <span className="text-warning/70 text-[9px] font-bold">WARN</span>}
+                          {line.prefix === "log"   && <span className="text-muted/50">▸</span>}
+                          {line.prefix === "warn"  && <span className="text-warning/70 text-[9px] font-bold">WARN</span>}
                           {line.prefix === "error" && <span className="text-error/70 text-[9px] font-bold">ERR</span>}
                         </span>
                         <span className={line.cls}>{line.text}</span>
@@ -338,7 +341,6 @@ function TicketTimeline({ activityData }: { activityData: number[] }) {
 }
 
 /* ─── Icons ─────────────────────────────────────────────── */
-
 
 function CodeIcon() {
   return (

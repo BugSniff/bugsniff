@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { content, type Locale } from "@/lib/content";
 
 interface WaitlistModalProps {
   open: boolean;
   source: string;
   onClose: () => void;
+  locale?: Locale;
 }
 
 type State = "idle" | "loading" | "success" | "error";
 
-export default function WaitlistModal({ open, source, onClose }: WaitlistModalProps) {
+export default function WaitlistModal({ open, source, onClose, locale = "pt" }: WaitlistModalProps) {
+  const t = content[locale].modal;
+
   const [email, setEmail]       = useState("");
   const [feedback, setFeedback] = useState("");
   const [state, setState]       = useState<State>("idle");
@@ -54,11 +58,11 @@ export default function WaitlistModal({ open, source, onClose }: WaitlistModalPr
       if (res.ok) { setState("success"); }
       else {
         setState("error");
-        setErrorMsg(data.error || "Algo deu errado. Tente novamente.");
+        setErrorMsg(data.error || t.errorFallback);
       }
     } catch {
       setState("error");
-      setErrorMsg("Erro de conexão. Verifique sua internet e tente novamente.");
+      setErrorMsg(t.errorConnection);
     }
   }
 
@@ -75,14 +79,14 @@ export default function WaitlistModal({ open, source, onClose }: WaitlistModalPr
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <div>
             <h2 className="font-geist text-base font-semibold text-primary">
-              Entrar na lista de espera
+              {t.title}
             </h2>
-            <p className="text-xs text-secondary mt-0.5">Te avisamos quando o BugSniff abrir.</p>
+            <p className="text-xs text-secondary mt-0.5">{t.subtitle}</p>
           </div>
           <button
             onClick={onClose}
             className="text-secondary hover:text-primary transition-colors cursor-pointer p-1 rounded hover:bg-surface-hover"
-            aria-label="Fechar"
+            aria-label={t.closeLabel}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -99,16 +103,18 @@ export default function WaitlistModal({ open, source, onClose }: WaitlistModalPr
               </svg>
             </div>
             <div>
-              <h3 className="font-geist text-base font-semibold text-primary mb-1">Você está na lista!</h3>
+              <h3 className="font-geist text-base font-semibold text-primary mb-1">{t.successTitle}</h3>
               <p className="text-sm text-secondary">
-                Te avisamos por email assim que o BugSniff abrir.<br />Obrigado pelo interesse!
+                {t.successDesc.split("\n").map((line, i) => (
+                  <span key={i}>{line}{i === 0 && <br />}</span>
+                ))}
               </p>
             </div>
             <button
               onClick={onClose}
               className="mt-2 px-4 py-2 text-sm text-secondary hover:text-primary border border-border rounded-md hover:bg-surface-hover transition-colors cursor-pointer"
             >
-              Fechar
+              {t.closeBtn}
             </button>
           </div>
         ) : (
@@ -116,7 +122,7 @@ export default function WaitlistModal({ open, source, onClose }: WaitlistModalPr
             {/* Email */}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="waitlist-email" className="text-xs font-medium text-secondary">
-                Email <span className="text-error">*</span>
+                {t.emailLabel} <span className="text-error">*</span>
               </label>
               <input
                 ref={inputRef}
@@ -125,7 +131,7 @@ export default function WaitlistModal({ open, source, onClose }: WaitlistModalPr
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@empresa.com"
+                placeholder={t.emailPlaceholder}
                 disabled={state === "loading"}
                 className="w-full px-3 py-2.5 text-sm rounded-md border border-border-strong bg-page text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-colors disabled:opacity-50"
               />
@@ -134,14 +140,14 @@ export default function WaitlistModal({ open, source, onClose }: WaitlistModalPr
             {/* Feedback */}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="waitlist-feedback" className="text-xs font-medium text-secondary">
-                Qual seu maior desafio com bugs?{" "}
-                <span className="text-muted">(opcional)</span>
+                {t.feedbackLabel}{" "}
+                <span className="text-muted">{t.feedbackOptional}</span>
               </label>
               <textarea
                 id="waitlist-feedback"
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Ex: testers não conseguem descrever o contexto, bugs não reproduzíveis..."
+                placeholder={t.feedbackPlaceholder}
                 rows={3}
                 disabled={state === "loading"}
                 className="w-full px-3 py-2.5 text-sm rounded-md border border-border-strong bg-page text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-colors resize-none disabled:opacity-50"
@@ -171,15 +177,15 @@ export default function WaitlistModal({ open, source, onClose }: WaitlistModalPr
                   <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                   </svg>
-                  Enviando...
+                  {t.submittingBtn}
                 </>
               ) : (
-                "Me avise quando estiver pronto"
+                t.submitBtn
               )}
             </button>
 
             <p className="text-[10px] text-muted text-center">
-              Sem spam. Apenas um aviso quando o produto abrir.
+              {t.noSpam}
             </p>
           </form>
         )}

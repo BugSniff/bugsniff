@@ -1,6 +1,5 @@
 {
   "framework": "nextjs",
-  "buildCommand": "pnpm turbo build --filter=@bugsniff/web",
-  "outputDirectory": "apps/web/.next",
-  "installCommand": "pnpm install"
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@bugsniff/web",
+  "installCommand": "cd ../.. && pnpm install"
 }

@@ -14,24 +14,24 @@ const ticketActivityData = [
 
 const ticketLogs = [
   { t: "00:38", color: "text-secondary", text: "→  Navegou para /checkout" },
-  { t: "00:41", color: "text-accent",    text: "↖  Clique em 'Finalizar compra'" },
-  { t: "00:41", color: "text-success",   text: "⇅  GET /api/user · 200 OK" },
-  { t: "00:41", color: "text-success",   text: "⇅  GET /api/cart · 200 OK" },
-  { t: "00:42", color: "text-warning",   text: "⇅  POST /api/apply-coupon · 206 Partial" },
-  { t: "00:42", color: "text-error",     text: "⇅  POST /api/checkout · 422 Unprocessable" },
-  { t: "00:42", color: "text-error",     text: "✕  TypeError: Cannot read properties of undefined (reading 'id')" },
-  { t: "00:42", color: "text-error",     text: "✕  Uncaught error in event handler" },
+  { t: "00:41", color: "text-accent", text: "↖  Clique em 'Finalizar compra'" },
+  { t: "00:41", color: "text-success", text: "⇅  GET /api/user · 200 OK" },
+  { t: "00:41", color: "text-success", text: "⇅  GET /api/cart · 200 OK" },
+  { t: "00:42", color: "text-warning", text: "⇅  POST /api/apply-coupon · 206 Partial" },
+  { t: "00:42", color: "text-error", text: "⇅  POST /api/checkout · 422 Unprocessable" },
+  { t: "00:42", color: "text-error", text: "✕  TypeError: Cannot read properties of undefined (reading 'id')" },
+  { t: "00:42", color: "text-error", text: "✕  Uncaught error in event handler" },
 ];
 
 const consoleLogs: { prefix: string | null; cls: string; text: string }[] = [
-  { prefix: "log",   cls: "text-secondary/60", text: "Cart loaded  {items: 3, total: 249.90}" },
-  { prefix: "log",   cls: "text-secondary/60", text: "Applying coupon code PROMO10..." },
-  { prefix: "log",   cls: "text-secondary/60", text: "Initiating checkout..." },
-  { prefix: "warn",  cls: "text-warning",      text: "Missing required field: billing.address" },
-  { prefix: "error", cls: "text-error",        text: "TypeError: Cannot read properties of undefined (reading 'id')" },
-  { prefix: null,    cls: "text-error/50",     text: "    at CheckoutForm.handleSubmit (checkout.js:142:18)" },
-  { prefix: null,    cls: "text-error/50",     text: "    at HTMLButtonElement.onClick (checkout.js:89:5)" },
-  { prefix: null,    cls: "text-error/50",     text: "    at EventTarget.dispatchEvent (native)" },
+  { prefix: "log", cls: "text-secondary/60", text: "Cart loaded  {items: 3, total: 249.90}" },
+  { prefix: "log", cls: "text-secondary/60", text: "Applying coupon code PROMO10..." },
+  { prefix: "log", cls: "text-secondary/60", text: "Initiating checkout..." },
+  { prefix: "warn", cls: "text-warning", text: "Missing required field: billing.address" },
+  { prefix: "error", cls: "text-error", text: "TypeError: Cannot read properties of undefined (reading 'id')" },
+  { prefix: null, cls: "text-error/50", text: "    at CheckoutForm.handleSubmit (checkout.js:142:18)" },
+  { prefix: null, cls: "text-error/50", text: "    at HTMLButtonElement.onClick (checkout.js:89:5)" },
+  { prefix: null, cls: "text-error/50", text: "    at EventTarget.dispatchEvent (native)" },
 ];
 
 /* ─── Hero ──────────────────────────────────────────────── */
@@ -79,7 +79,7 @@ export default function Hero({ onCta }: HeroProps) {
 
         {/* Subheadline */}
         <p className="text-lg sm:text-xl text-secondary max-w-xl leading-relaxed">
-          Cole um script no seu SaaS em 30 segundos. Cada report chega com
+          Cole um script no seu SaaS em 30 segundos. Cada report chega com Replay da Interação do seu usuário,
           sessão gravada, logs de rede e console —{" "}
           <span className="text-primary">sem ida e volta.</span>
         </p>
@@ -100,7 +100,10 @@ export default function Hero({ onCta }: HeroProps) {
               <CodeIcon />
               <span className="text-sm font-medium text-primary">Para seu site</span>
             </div>
-            <WidgetDemo onTicketCreated={() => setTicketCreated(true)} />
+            <WidgetDemo
+              onTicketCreated={() => setTicketCreated(true)}
+              onClose={() => setTicketCreated(false)}
+            />
             <p className="text-xs text-secondary">
               Simule o fluxo completo — clique em{" "}
               <span className="text-primary font-medium">Enviar report</span> no widget e veja
@@ -111,7 +114,20 @@ export default function Hero({ onCta }: HeroProps) {
 
         {/* ── Ticket view — aparece após criar ticket ── */}
         {ticketCreated && (
-          <div className="w-full max-w-2xl rounded-lg border border-border bg-surface overflow-hidden animate-slide-up-widget">
+          <div className="w-full max-w-2xl flex flex-col gap-3 animate-slide-up-widget">
+            {/* Título */}
+            <div className="flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent shrink-0">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <p className="text-xs text-secondary">
+                É assim que vai ficar seu ticket no{" "}
+                <span className="text-primary font-medium">dashboard</span>
+              </p>
+            </div>
+
+          <div className="rounded-lg border border-border bg-surface overflow-hidden">
             {/* Browser chrome */}
             <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border">
               <span className="w-2.5 h-2.5 rounded-full bg-border-strong" />
@@ -176,9 +192,8 @@ export default function Hero({ onCta }: HeroProps) {
                   {Array.from({ length: 14 }).map((_, i) => (
                     <div
                       key={i}
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        i < 9 ? "bg-accent/80" : i < 11 ? "bg-accent/30" : "bg-border-strong"
-                      }`}
+                      className={`w-1.5 h-1.5 rounded-full ${i < 9 ? "bg-accent/80" : i < 11 ? "bg-accent/30" : "bg-border-strong"
+                        }`}
                     />
                   ))}
                 </div>
@@ -223,8 +238,8 @@ export default function Hero({ onCta }: HeroProps) {
                       <div key={i} className="flex items-start gap-3">
                         {/* Prefix column */}
                         <span className="shrink-0 w-10 text-right">
-                          {line.prefix === "log"   && <span className="text-muted/50">▸</span>}
-                          {line.prefix === "warn"  && <span className="text-warning/70 text-[9px] font-bold">WARN</span>}
+                          {line.prefix === "log" && <span className="text-muted/50">▸</span>}
+                          {line.prefix === "warn" && <span className="text-warning/70 text-[9px] font-bold">WARN</span>}
                           {line.prefix === "error" && <span className="text-error/70 text-[9px] font-bold">ERR</span>}
                         </span>
                         <span className={line.cls}>{line.text}</span>
@@ -241,6 +256,7 @@ export default function Hero({ onCta }: HeroProps) {
 
             </div>
           </div>
+          </div>
         )}
       </div>
     </section>
@@ -250,14 +266,14 @@ export default function Hero({ onCta }: HeroProps) {
 /* ─── TicketTimeline ────────────────────────────────────── */
 
 function TicketTimeline({ activityData }: { activityData: number[] }) {
-  const [leftPct, setLeftPct]   = useState(28);
+  const [leftPct, setLeftPct] = useState(28);
   const [rightPct, setRightPct] = useState(84);
-  const leftRef  = useRef(28);
+  const leftRef = useRef(28);
   const rightRef = useRef(84);
   const trackRef = useRef<HTMLDivElement>(null);
   const dragging = useRef<"left" | "right" | null>(null);
 
-  const updateLeft  = (v: number) => { leftRef.current  = v; setLeftPct(v); };
+  const updateLeft = (v: number) => { leftRef.current = v; setLeftPct(v); };
   const updateRight = (v: number) => { rightRef.current = v; setRightPct(v); };
 
   const onHandleMouseDown = (handle: "left" | "right") => (e: React.MouseEvent) => {

@@ -19,13 +19,21 @@ const logEvents = [
 
 interface WidgetDemoProps {
   onTicketCreated?: () => void;
+  onClose?: () => void;
 }
 
-export default function WidgetDemo({ onTicketCreated }: WidgetDemoProps) {
-  const [step, setStep] = useState<Step>("open");
+export default function WidgetDemo({ onTicketCreated, onClose }: WidgetDemoProps) {
+  const [step, setStep] = useState<Step>("closed");
   const isOpen = step !== "closed";
 
-  const toggle = () => setStep(s => (s === "closed" ? "open" : "closed"));
+  const toggle = () => {
+    if (isOpen) {
+      setStep("closed");
+      onClose?.();
+    } else {
+      setStep("open");
+    }
+  };
 
   const handleSendReport = () => {
     setStep("sending");
@@ -41,7 +49,7 @@ export default function WidgetDemo({ onTicketCreated }: WidgetDemoProps) {
   };
 
   return (
-    <div className="relative h-[380px] rounded-md overflow-hidden select-none border border-border bg-page">
+    <div className="relative h-[380px] rounded-md overflow-hidden select-none border border-border bg-page ">
       {/* Fake browser bar */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-page-alt">
         <span className="w-2 h-2 rounded-full bg-border-strong" />
@@ -65,7 +73,7 @@ export default function WidgetDemo({ onTicketCreated }: WidgetDemoProps) {
       </div>
 
       {/* Floating widget — bottom-right corner */}
-      <div className="absolute bottom-4 right-4 flex items-end gap-3">
+      <div className="absolute bottom-4 right-4 flex items-end gap-3 max-[490px]:flex-col max-[490px]:bottom-2 ">
         {/* Widget panel */}
         {isOpen && (
           <div className="w-72 rounded-xl bg-surface border border-border shadow-2xl overflow-hidden animate-slide-up-widget">

@@ -21,18 +21,9 @@ export default function CtaSection({ onCta }: CtaSectionProps) {
           >
             Entrar na lista de espera
           </button>
-          <a
-            href="mailto:contato@bugsniff.com.br"
-            className="text-sm text-secondary hover:text-primary transition-colors"
-          >
-            Ou fale direto →
-          </a>
+
         </div>
-        <div className="flex items-center gap-6 text-xs text-secondary">
-          <span>✓ Gratuito para começar</span>
-          <span>✓ Sem cartão de crédito</span>
-          <span>✓ Aviso por email</span>
-        </div>
+
       </div>
     </section>
   );

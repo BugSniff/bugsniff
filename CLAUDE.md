@@ -13,3 +13,9 @@ The five canonical triage roles, each label string equal to its name. See `docs/
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### AGENTS.md
+
+Gerado e re-adicionado automaticamente pelo `next dev` — não editar à mão. As
+convenções deste projeto ficam neste arquivo (`CLAUDE.md`), no `CONTEXT.md` e em
+`docs/adr/`.

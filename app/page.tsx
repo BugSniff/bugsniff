@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { parseTargetUrl } from "@/packages/scan/target-url";
 import { createAdminClient } from "@/packages/supabase/admin";
 import { createClient } from "@/packages/supabase/server";
+import { SubmitButton } from "./submit-button";
 
 /** Why a URL was refused, in words the person can act on. */
 const REFUSALS: Record<string, string> = {
@@ -115,9 +116,12 @@ export default async function Home({
             </p>
           )}
 
-          <button className="rounded-lg bg-zinc-900 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
+          <SubmitButton
+            working="Enviando o link…"
+            className="rounded-lg bg-zinc-900 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+          >
             Examinar
-          </button>
+          </SubmitButton>
 
           <p className="text-xs text-zinc-500">
             Mandamos o resultado por um link no seu e-mail. Sem senha: o link é

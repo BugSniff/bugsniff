@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/packages/supabase/server";
+import { SubmitButton } from "../submit-button";
 
 /**
  * Sends the link that is the only way in.
@@ -70,9 +71,12 @@ export default async function LoginPage({
             </p>
           )}
 
-          <button className="rounded-lg bg-zinc-900 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
+          <SubmitButton
+            working="Enviando…"
+            className="rounded-lg bg-zinc-900 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+          >
             Enviar link de acesso
-          </button>
+          </SubmitButton>
         </form>
       )}
 

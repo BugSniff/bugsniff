@@ -35,6 +35,33 @@ export type ConsentBannerState =
   /** Our browser found nothing that asks. The screenshot is what backs it. */
   | "not-found";
 
+/**
+ * The store's own screen at each reading.
+ *
+ * Kept for every scan, not only the ones that went wrong. A picture cannot
+ * show a cookie — cookies are invisible — so it is never evidence that one was
+ * written. What it is evidence of is the screen the visitor was looking at
+ * while they were: the banner still asking, with the trackers already there.
+ */
+export type Evidence = {
+  /** Before any interaction. Always taken. */
+  preConsent: Buffer | null;
+  /** After accepting, when there was something to accept. */
+  postConsent: Buffer | null;
+};
+
+/**
+ * The first half of the reading, handed over as soon as it exists.
+ *
+ * The banner search can take twenty seconds, and everything in here is already
+ * true five seconds in. Waiting for the whole scan to finish before showing any
+ * of it is making the person watch a blank screen hold facts we already have.
+ */
+export type PreConsentReading = {
+  cookies: ObservedCookie[];
+  evidence: Buffer | null;
+};
+
 /** A cookie the store's page left behind, as the browser saw it. */
 export type ObservedCookie = {
   name: string;
@@ -46,7 +73,11 @@ export type ObservedCookie = {
   phase: ConsentPhase;
 };
 
-export type ScanRejection = TargetRejection | "unreachable";
+export type ScanRejection =
+  | TargetRejection
+  | "unreachable"
+  /** Something answered, and it was not the store. */
+  | "blocked";
 
 export type Scan =
   | {
@@ -56,17 +87,15 @@ export type Scan =
       consentBanner: ConsentBannerState;
       /** The consent platform whose trace was found, when one was. */
       consentPlatform: string | null;
-      /**
-       * JPEG of the store as it stood before any interaction.
-       *
-       * Kept only when the scan could not accept, because that is when what it
-       * reports needs a human to be able to check it. Only the picture confirms
-       * "this store asks nothing" — the machine can only say it did not find.
-       */
-      evidence: Buffer | null;
+      evidence: Evidence;
       cookies: ObservedCookie[];
     }
-  | { ok: false; reason: ScanRejection };
+  | {
+      ok: false;
+      reason: ScanRejection;
+      /** The screen that came instead of the store, when there was one. */
+      evidence?: Buffer | null;
+    };
 
 /** How long the store gets to answer before the scan gives up on it. */
 const NAVIGATION_TIMEOUT_MS = 20_000;
@@ -121,18 +150,47 @@ async function openBrowser(): Promise<Browser> {
   });
 }
 
-async function load(page: Page, url: URL) {
+/**
+ * Opens the store, and says whether what answered was the store.
+ *
+ * A shop that refuses our browser still returns a page, with a title and a
+ * body and cookies of its own — and read without looking at the status, that
+ * page is indistinguishable from a store that behaves impeccably. Measured on
+ * the four stores that came back with nothing to report: centauro, netshoes
+ * and casasbahia all answer 403, and havan, which is a real reading, answers
+ * 200 with four thousand elements.
+ *
+ * ponytail: status only. A challenge served with 200 — some Cloudflare
+ * interstitials do that — still reads as a store. The next signal to add is
+ * the challenge's own wording, and the moment to add it is the first time one
+ * shows up in the queue, not before.
+ */
+async function load(page: Page, url: URL): Promise<{ isStore: boolean }> {
   // `domcontentloaded`, not `load`: waiting for every image on a shop's home
   // page buys nothing here. Measured against a real store, both readings
   // returned the same 27 cookies, because trackers fire long before the last
   // image lands. On a slow store `load` would blow the timeout and report a
   // page that rendered fine as unreachable.
-  await page.goto(url.href, {
+  const response = await page.goto(url.href, {
     waitUntil: "domcontentloaded",
     timeout: NAVIGATION_TIMEOUT_MS,
   });
+
+  const status = response?.status() ?? 0;
+  if (status >= 400) return { isStore: false };
+
   await page.waitForTimeout(SETTLE_MS);
+  return { isStore: true };
 }
+
+/**
+ * The screen as it stands, small enough to keep.
+ *
+ * The fold, not the whole page: nobody needs a ten-thousand-pixel column to
+ * recognise a banner, and every scan keeps two of these.
+ */
+const screenshot = (page: Page) =>
+  page.screenshot({ type: "jpeg", quality: 60 }).catch(() => null);
 
 /** Identity of a cookie across the two readings — a store may reset its value. */
 const cookieKey = (cookie: { name: string; domain: string }) =>
@@ -167,7 +225,10 @@ const observed = (
  * from pointing it at the cloud metadata endpoint. Exported for the fixture
  * tests, which serve stores on loopback that the guard would rightly refuse.
  */
-export async function observeStore(url: URL): Promise<Scan> {
+export async function observeStore(
+  url: URL,
+  onPreConsent?: (reading: PreConsentReading) => Promise<void>
+): Promise<Scan> {
   let browser: Browser | undefined;
   try {
     browser = await openBrowser();
@@ -186,8 +247,29 @@ export async function observeStore(url: URL): Promise<Scan> {
     });
     const page = await context.newPage();
 
-    await load(page, url);
+    if (!(await load(page, url)).isStore) {
+      // Not a clean store: a store we did not read. Saying "no cookies were
+      // written" about a page that is not the shop would be the most flattering
+      // possible way to be wrong.
+      return {
+        ok: false,
+        reason: "blocked",
+        evidence: await screenshot(page),
+      };
+    }
+
     const beforeConsent = await context.cookies();
+    const beforeScreen = await screenshot(page);
+
+    // Handed over before the banner search, which is the slow part. Whoever is
+    // watching gets the pre-consent state at five seconds instead of at
+    // twenty-five, and the state that matters most is the one they get first.
+    await onPreConsent?.({
+      cookies: observed(beforeConsent, "pre-consent"),
+      evidence: beforeScreen,
+    }).catch(() => {
+      // The screen missing an early update is not worth losing the scan over.
+    });
 
     const platform = await detectConsentPlatform(
       page,
@@ -211,9 +293,7 @@ export async function observeStore(url: URL): Promise<Scan> {
         at,
         consentBanner: banner.found || platform ? "unrecognised" : "not-found",
         consentPlatform: platform,
-        evidence: await page
-          .screenshot({ type: "jpeg", quality: 60 })
-          .catch(() => null),
+        evidence: { preConsent: beforeScreen, postConsent: null },
         cookies: observed(beforeConsent, "pre-consent"),
       };
     }
@@ -224,6 +304,7 @@ export async function observeStore(url: URL): Promise<Scan> {
     // injects them, and the moment a single reload-less reading would miss.
     await load(page, url);
     const afterConsent = await context.cookies();
+    const afterScreen = await screenshot(page);
 
     const alreadySeen = new Set(beforeConsent.map(cookieKey));
 
@@ -233,7 +314,7 @@ export async function observeStore(url: URL): Promise<Scan> {
       at,
       consentBanner: "accepted",
       consentPlatform: platform,
-      evidence: null,
+      evidence: { preConsent: beforeScreen, postConsent: afterScreen },
       cookies: [
         ...observed(beforeConsent, "pre-consent"),
         ...observed(
@@ -261,9 +342,12 @@ export async function observeStore(url: URL): Promise<Scan> {
  * duration budget (ADR-0002), and a batch that times out loses every result in
  * it rather than one.
  */
-export async function runScan(rawUrl: string): Promise<Scan> {
+export async function runScan(
+  rawUrl: string,
+  onPreConsent?: (reading: PreConsentReading) => Promise<void>
+): Promise<Scan> {
   const target = await parseTargetUrl(rawUrl);
   if (!target.ok) return { ok: false, reason: target.reason };
 
-  return observeStore(target.url);
+  return observeStore(target.url, onPreConsent);
 }

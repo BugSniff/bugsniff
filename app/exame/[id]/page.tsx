@@ -18,6 +18,8 @@ const FAILURES: Record<ScanRejection, string> = {
   unresolvable: "Não encontramos esse endereço.",
   "private-address": "Esse endereço não é público.",
   unreachable: "A loja não respondeu a tempo. Pode estar fora do ar.",
+  blocked:
+    "A loja respondeu ao nosso navegador com uma página de erro, não com a loja. Não é um exame limpo: é um exame que não aconteceu.",
 };
 
 /** `phase` is absent on scans read before the two states existed. */
@@ -49,7 +51,7 @@ export default async function ScanPage({
   const { data: scan } = await supabase
     .from("scans")
     .select(
-      "id, url, status, cookies, consent_banner, consent_platform, evidence_path, failure"
+      "id, url, status, cookies, consent_banner, consent_platform, evidence_pre_path, evidence_post_path, failure"
     )
     .eq("id", id)
     .maybeSingle();
@@ -74,13 +76,27 @@ export default async function ScanPage({
     );
   }
 
-  // The screenshot is guarded by the same rule as the scan, so asking for a
-  // link to it is asking the same question again — and getting the same answer.
-  const { data: evidence } = scan.evidence_path
-    ? await supabase.storage
-        .from("scan-evidence")
-        .createSignedUrl(scan.evidence_path, EVIDENCE_LINK_SECONDS)
-    : { data: null };
+  // The screenshots are guarded by the same rule as the scan, so asking for
+  // links is asking the same question again — and getting the same answer.
+  const link = async (path: string | null) =>
+    path
+      ? ((
+          await supabase.storage
+            .from("scan-evidence")
+            .createSignedUrl(path, EVIDENCE_LINK_SECONDS)
+        ).data?.signedUrl ?? null)
+      : null;
+
+  const [beforeShot, afterShot] = await Promise.all([
+    link(scan.evidence_pre_path),
+    link(scan.evidence_post_path),
+  ]);
+
+  const cookies = (scan.cookies ?? []) as Cookie[];
+
+  // The pre-consent state is written the moment the browser has it, so there
+  // is a real reading to show while the second one is still being taken.
+  const reading = waiting && cookies.length > 0;
 
   return (
     <main className="mx-auto flex flex-1 w-full max-w-2xl flex-col justify-center gap-6 px-6 py-16">
@@ -93,31 +109,44 @@ export default async function ScanPage({
 
       {waiting && (
         <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
-          {scan.status === "running"
-            ? "Abrindo a loja num navegador de verdade…"
-            : "Na fila. Começa assim que uma vaga abrir."}{" "}
+          {scan.status === "pending"
+            ? "Na fila. Começa assim que uma vaga abrir."
+            : reading
+              ? "Esta é a loja antes de qualquer interação. Agora respondendo ao banner, para ver o que muda depois do consentimento…"
+              : "Abrindo a loja num navegador de verdade…"}{" "}
           Esta página se atualiza sozinha.
         </p>
       )}
 
       {scan.status === "failed" && (
-        <p role="alert" className="text-sm text-red-600">
-          {FAILURES[scan.failure as ScanRejection] ??
-            "O exame não pôde ser concluído."}
-        </p>
+        <>
+          <p role="alert" className="text-sm text-red-600">
+            {FAILURES[scan.failure as ScanRejection] ??
+              "O exame não pôde ser concluído."}
+          </p>
+          {beforeShot && (
+            <Shot
+              url={beforeShot}
+              title="A tela que nosso navegador recebeu"
+              detail="no lugar da loja"
+              alt="A página de erro que a loja devolveu ao nosso navegador"
+            />
+          )}
+        </>
       )}
 
-      {scan.status === "done" && (
+      {(scan.status === "done" || reading) && (
         <>
           <BannerNote
             state={scan.consent_banner}
             platform={scan.consent_platform}
           />
-          <Cookies
-            cookies={scan.cookies as Cookie[]}
-            consentBanner={scan.consent_banner}
+          <Cookies cookies={cookies} consentBanner={scan.consent_banner} />
+          <Timeline
+            cookies={cookies}
+            beforeShot={beforeShot}
+            afterShot={afterShot}
           />
-          {evidence && <Evidence url={evidence.signedUrl} />}
         </>
       )}
 
@@ -236,20 +265,71 @@ function BannerNote({
   );
 }
 
-function Evidence({ url }: { url: string }) {
+/**
+ * The store's own screen at each reading, next to what it had written by then.
+ *
+ * The pairing is what carries the weight, and the caption is careful about
+ * which half says what: the picture cannot show a cookie, because cookies are
+ * invisible. It shows the screen the visitor was looking at while the cookies
+ * listed above were already on their machine.
+ */
+function Timeline({
+  cookies,
+  beforeShot,
+  afterShot,
+}: {
+  cookies: Cookie[];
+  beforeShot: string | null;
+  afterShot: string | null;
+}) {
+  if (!beforeShot) return null;
+
+  const before = cookies.filter((c) => c.phase !== "post-consent").length;
+  const after = cookies.length - before;
+
+  return (
+    <section className="flex flex-col gap-6">
+      <Shot
+        url={beforeShot}
+        title="Antes de qualquer clique"
+        detail={`${before} cookies já gravados`}
+        alt="A loja como nosso navegador a viu, antes de qualquer interação"
+      />
+
+      {afterShot && (
+        <Shot
+          url={afterShot}
+          title="Depois de aceitar o banner"
+          detail={after > 0 ? `mais ${after} cookies` : "nenhum cookie novo"}
+          alt="A loja depois de o exame aceitar o banner de consentimento"
+        />
+      )}
+    </section>
+  );
+}
+
+function Shot({
+  url,
+  title,
+  detail,
+  alt,
+}: {
+  url: string;
+  title: string;
+  detail: string;
+  alt: string;
+}) {
   return (
     <figure className="flex flex-col gap-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt="A loja como nosso navegador a viu, antes de qualquer interação"
-        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800"
-      />
-      <figcaption className="text-xs text-zinc-500">
-        A loja no momento da leitura, antes de qualquer interação. A imagem não
-        mostra cookies: ela mostra a tela em que os cookies acima já estavam
-        gravados.
+      <figcaption className="text-sm text-zinc-600 dark:text-zinc-400">
+        {title} <span className="text-zinc-500">· {detail}</span>
       </figcaption>
+      {/* The browser reads at 1280x720, and reserving that ratio keeps the
+          picture from shoving the page around when it finally lands. */}
+      <div className="aspect-[16/9] w-full overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={alt} className="w-full" />
+      </div>
     </figure>
   );
 }

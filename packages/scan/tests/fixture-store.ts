@@ -136,6 +136,34 @@ const UNCLICKABLE = html(`
 const NO_BANNER = html("");
 
 /**
+ * The published policy, and the link a store puts in its footer.
+ *
+ * Long on purpose: a policy is a long document, and the scan refuses anything
+ * short enough to be a redirect notice or a cookie wall pretending to be one.
+ */
+const POLICY_LINK = `<footer><a href="/politica-de-privacidade">Política de Privacidade</a></footer>`;
+
+const POLICY_BODY = `Esta política descreve como tratamos dados pessoais dos
+visitantes desta loja, para que finalidades, por quanto tempo e com quem eles
+são compartilhados. `.repeat(6);
+
+const POLICY = `<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Política de Privacidade</title></head>
+<body>
+<nav>Início Produtos Carrinho Minha conta</nav>
+<header>Loja de teste</header>
+<main>
+  <h1>Política de Privacidade</h1>
+  <p>${POLICY_BODY}</p>
+  <p>Utilizamos cookies de terceiros para medir audiência.</p>
+</main>
+<footer>Rodapé com endereço, CNPJ e telefone de contato</footer>
+</body>
+</html>
+`;
+
+/**
  * A shop that refuses our browser.
  *
  * Answers 403 with a page of its own — title, body, and a cookie. Read without
@@ -161,7 +189,8 @@ const REFUSED = `<!doctype html>
 const FOOTER_TRAP = `<footer><a href="#" onclick="consent('all')">Aceito os termos de uso</a></footer>`;
 
 const PAGES: Record<string, string> = {
-  "/": WITH_BANNER,
+  "/": WITH_BANNER.replace("</body>", `${POLICY_LINK}</body>`),
+  "/politica-de-privacidade": POLICY,
   "/homemade": HOMEMADE,
   "/iframe": IN_IFRAME,
   "/banner-frame": BANNER_FRAME,

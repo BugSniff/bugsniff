@@ -8,6 +8,7 @@ import {
   acceptConsentBanner,
   detectConsentPlatform,
 } from "./lib/consent-banner";
+import { readPolicy, type PolicyReading } from "./lib/policy";
 import { thirdPartyHosts } from "./third-party";
 import { parseTargetUrl, type TargetRejection } from "./target-url";
 
@@ -19,6 +20,8 @@ import { parseTargetUrl, type TargetRejection } from "./target-url";
  * before any interaction is the fact the audit exists to observe.
  */
 export type ConsentPhase = "pre-consent" | "post-consent";
+
+export type { PolicyReading };
 
 /**
  * What the scan can honestly say about the banner.
@@ -104,6 +107,8 @@ export type Scan =
       evidence: Evidence;
       cookies: ObservedCookie[];
       requests: ObservedRequest[];
+      /** What the store says it does, as published on the store itself. */
+      policy: PolicyReading;
     }
   | {
       ok: false;
@@ -323,6 +328,9 @@ export async function observeStore(
         evidence: { preConsent: beforeScreen, postConsent: null },
         cookies: observed(beforeConsent, "pre-consent"),
         requests: asRequests(beforeHosts, "pre-consent"),
+        // Last, because it navigates away: anything measured after this would
+        // be measuring the policy page instead of the shop.
+        policy: await readPolicy(page),
       };
     }
 
@@ -348,6 +356,7 @@ export async function observeStore(
       consentBanner: "accepted",
       consentPlatform: platform,
       evidence: { preConsent: beforeScreen, postConsent: afterScreen },
+      policy: await readPolicy(page),
       requests: [
         ...asRequests(beforeHosts, "pre-consent"),
         ...asRequests(afterHosts, "post-consent"),

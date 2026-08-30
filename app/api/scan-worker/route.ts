@@ -119,6 +119,9 @@ async function work({ supabase }: Worker, scanId: string) {
             requests: scan.requests,
             consent_banner: scan.consentBanner,
             consent_platform: scan.consentPlatform,
+            policy_state: scan.policy.state,
+            policy_url: "url" in scan.policy ? scan.policy.url : null,
+            policy_text: "text" in scan.policy ? scan.policy.text : null,
             evidence_post_path: await storeEvidence(
               { supabase },
               scanId,

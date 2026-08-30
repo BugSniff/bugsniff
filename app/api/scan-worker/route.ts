@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { runScan } from "@/packages/scan/scan";
+import { runScan, type ConsentPhase } from "@/packages/scan/scan";
 import { createAdminClient } from "@/packages/supabase/admin";
 
 /** A cold start unpacks Chromium before it can open anything. */
@@ -44,18 +44,20 @@ type Worker = { supabase: ReturnType<typeof createAdminClient> };
 const EVIDENCE_BUCKET = "scan-evidence";
 
 /**
- * Files the screenshot under the scan that produced it.
+ * Files a screenshot under the scan that produced it.
  *
- * Named after the scan on purpose: the storage policy resolves the object's
- * name back to the row, so the picture is readable by exactly the people the
- * reading is.
+ * Foldered by scan on purpose: the storage policy resolves the folder back to
+ * the row, so a picture is readable by exactly the people the reading is.
  */
 async function storeEvidence(
   { supabase }: Worker,
   scanId: string,
-  evidence: Buffer
+  reading: ConsentPhase,
+  evidence: Buffer | null
 ): Promise<string | null> {
-  const path = `${scanId}.jpg`;
+  if (!evidence) return null;
+
+  const path = `${scanId}/${reading}.jpg`;
 
   const { error } = await supabase.storage
     .from(EVIDENCE_BUCKET)
@@ -83,13 +85,25 @@ async function work({ supabase }: Worker, scanId: string) {
 
   if (!row) return;
 
-  const scan = await runScan(row.url);
-  const finishedAt = new Date().toISOString();
+  // The pre-consent state, written the moment it exists rather than at the end.
+  // The waiting screen listens to this row, so this update is what turns a
+  // blank wait into a result that fills in — same scan, same browser, same bill.
+  const scan = await runScan(row.url, async ({ cookies, evidence }) => {
+    await supabase
+      .from("scans")
+      .update({
+        cookies,
+        evidence_pre_path: await storeEvidence(
+          { supabase },
+          scanId,
+          "pre-consent",
+          evidence
+        ),
+      })
+      .eq("id", scanId);
+  });
 
-  const evidencePath =
-    scan.ok && scan.evidence
-      ? await storeEvidence({ supabase }, scanId, scan.evidence)
-      : null;
+  const finishedAt = new Date().toISOString();
 
   await supabase
     .from("scans")
@@ -100,7 +114,12 @@ async function work({ supabase }: Worker, scanId: string) {
             cookies: scan.cookies,
             consent_banner: scan.consentBanner,
             consent_platform: scan.consentPlatform,
-            evidence_path: evidencePath,
+            evidence_post_path: await storeEvidence(
+              { supabase },
+              scanId,
+              "post-consent",
+              scan.evidence.postConsent
+            ),
             finished_at: finishedAt,
           }
         : { status: "failed", failure: scan.reason, finished_at: finishedAt }

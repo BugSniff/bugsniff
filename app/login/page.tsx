@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/packages/supabase/server";
 
@@ -7,8 +8,22 @@ async function authenticate(formData: FormData, signingUp: boolean) {
   const password = String(formData.get("password") ?? "");
   const supabase = await createClient();
 
+  // Where the confirmation link should come back to. Without it Supabase falls
+  // back to the project's Site URL, which is the root of the site — the link
+  // would land somewhere that does not trade the code for a session, and the
+  // account would never confirm.
+  //
+  // Taken from the request rather than an env var so localhost, previews and
+  // production each send a link back to themselves. Server Actions always carry
+  // an Origin header; Next refuses the request otherwise.
+  const origin = (await headers()).get("origin");
+
   const { data, error } = signingUp
-    ? await supabase.auth.signUp({ email, password })
+    ? await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${origin}/auth/callback` },
+      })
     : await supabase.auth.signInWithPassword({ email, password });
 
   if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);

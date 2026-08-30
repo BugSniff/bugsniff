@@ -38,6 +38,12 @@ begin
     raise exception 'both signups landed in the same organization';
   end if;
 
+  -- One scan for each organization, plus an anonymous one belonging to nobody:
+  -- the shape the table actually holds once people scan before signing up.
+  insert into public.scans (organization_id, url) values (org_a, 'https://loja-a.example');
+  insert into public.scans (organization_id, url) values (org_b, 'https://loja-b.example');
+  insert into public.scans (organization_id, url) values (null, 'https://anonimo.example');
+
   -- From here on we are A, seen through RLS exactly as a request from the app.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   set local role authenticated;
@@ -57,6 +63,23 @@ begin
     raise exception 'A can read who belongs to B''s organization';
   end if;
 
+  select count(*) into visible from public.scans;
+  if visible <> 1 then
+    raise exception 'A sees % scans, expected only its own', visible;
+  end if;
+
+  select count(*) into visible from public.scans where organization_id = org_b;
+  if visible <> 0 then
+    raise exception 'A can read B''s scan';
+  end if;
+
+  -- The anonymous scan belongs to no organization, so it matches no policy.
+  -- Being signed in must not be a way to read what strangers scanned.
+  select count(*) into visible from public.scans where organization_id is null;
+  if visible <> 0 then
+    raise exception 'a signed-in member can read anonymous scans';
+  end if;
+
   -- Writes are denied by default: there is no insert, update or delete policy
   -- on either table, and none should appear without a ticket asking for it.
   begin
@@ -70,6 +93,15 @@ begin
     if found then
       raise exception 'A could rename its own organization';
     end if;
+  exception when insufficient_privilege then null;
+  end;
+
+  -- A scan is a fact our own browser observed. If a signed-in member could
+  -- write one, anyone could record that any store carried any cookie, and the
+  -- findings built on scans later would inherit that.
+  begin
+    insert into public.scans (organization_id, url) values (org_a, 'https://forjado.example');
+    raise exception 'A could record a scan';
   exception when insufficient_privilege then null;
   end;
 

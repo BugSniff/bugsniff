@@ -253,7 +253,10 @@ host = "smtp.resend.com"
 port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
-admin_email = "nao-responda@bugsniff.com.br"
+# Subdomain on purpose: transactional mail that bounces or gets marked as spam
+# damages the reputation of whatever domain sent it, and the apex is where sales
+# and support write from.
+admin_email = "nao-responda@updates.bugsniff.com.br"
 sender_name = "bugsniff"
 
 # Uncomment to customize email template

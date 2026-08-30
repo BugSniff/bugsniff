@@ -51,7 +51,12 @@ async function work({ supabase }: Worker, scanId: string) {
     .from("scans")
     .update(
       scan.ok
-        ? { status: "done", cookies: scan.cookies, finished_at: finishedAt }
+        ? {
+            status: "done",
+            cookies: scan.cookies,
+            consent_banner: scan.consentBanner,
+            finished_at: finishedAt,
+          }
         : { status: "failed", failure: scan.reason, finished_at: finishedAt }
     )
     .eq("id", scanId);

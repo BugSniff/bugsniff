@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import type { ScanRejection } from "@/packages/scan/scan";
+import type { ConsentPhase, ScanRejection } from "@/packages/scan/scan";
 import { createClient } from "@/packages/supabase/server";
 import { Watch } from "./watch";
 
@@ -16,7 +16,18 @@ const FAILURES: Record<ScanRejection, string> = {
   unreachable: "A loja não respondeu a tempo. Pode estar fora do ar.",
 };
 
-type Cookie = { name: string; domain: string; expires: number };
+/** `phase` is absent on scans read before the two states existed. */
+type Cookie = {
+  name: string;
+  domain: string;
+  expires: number;
+  phase?: ConsentPhase;
+};
+
+const PHASES: Record<ConsentPhase, string> = {
+  "pre-consent": "antes do consentimento",
+  "post-consent": "depois do consentimento",
+};
 
 export default async function ScanPage({
   params,
@@ -30,7 +41,7 @@ export default async function ScanPage({
   const supabase = await createClient();
   const { data: scan } = await supabase
     .from("scans")
-    .select("id, url, status, cookies, failure")
+    .select("id, url, status, cookies, consent_banner, failure")
     .eq("id", id)
     .maybeSingle();
 
@@ -79,7 +90,12 @@ export default async function ScanPage({
         </p>
       )}
 
-      {scan.status === "done" && <Cookies cookies={scan.cookies as Cookie[]} />}
+      {scan.status === "done" && (
+        <Cookies
+          cookies={scan.cookies as Cookie[]}
+          consentBanner={scan.consent_banner}
+        />
+      )}
 
       <p className="text-sm text-zinc-500">
         <Link href="/" className="underline">
@@ -90,11 +106,26 @@ export default async function ScanPage({
   );
 }
 
-function Cookies({ cookies }: { cookies: Cookie[] }) {
+function Cookies({
+  cookies,
+  consentBanner,
+}: {
+  cookies: Cookie[];
+  /** Null on scans read before the store was read in two states. */
+  consentBanner: boolean | null;
+}) {
+  // Two states to compare only where a banner answered. A store that asks
+  // nothing has one reading, because nothing was consented to.
+  const twoStates = consentBanner === true;
+  const before = cookies.filter((c) => c.phase !== "post-consent");
+  const after = cookies.length - before.length;
+
   if (cookies.length === 0) {
     return (
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Nenhum cookie foi gravado ao abrir esta loja.
+        {twoStates
+          ? "Nenhum cookie foi gravado nesta loja, nem antes nem depois do consentimento."
+          : "Nenhum cookie foi gravado ao abrir esta loja."}
       </p>
     );
   }
@@ -102,8 +133,17 @@ function Cookies({ cookies }: { cookies: Cookie[] }) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm text-zinc-600 dark:text-zinc-400">
-        {cookies.length} cookies gravados
+        {twoStates
+          ? `${before.length} cookies antes do consentimento, ${after} depois de aceitar o banner`
+          : `${cookies.length} cookies gravados`}
       </h2>
+
+      {consentBanner === false && (
+        <p className="text-sm text-zinc-500">
+          Esta loja não apresentou banner de consentimento, então foi lida uma
+          vez só.
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left text-sm">
@@ -115,9 +155,14 @@ function Cookies({ cookies }: { cookies: Cookie[] }) {
               <th className="border-b border-zinc-200 py-2 pr-4 font-normal dark:border-zinc-800">
                 Domínio
               </th>
-              <th className="border-b border-zinc-200 py-2 font-normal dark:border-zinc-800">
+              <th className="border-b border-zinc-200 py-2 pr-4 font-normal dark:border-zinc-800">
                 Duração
               </th>
+              {twoStates && (
+                <th className="border-b border-zinc-200 py-2 font-normal dark:border-zinc-800">
+                  Momento
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -129,11 +174,16 @@ function Cookies({ cookies }: { cookies: Cookie[] }) {
                 <td className="border-b border-zinc-100 py-2 pr-4 text-zinc-500 dark:border-zinc-900">
                   {cookie.domain}
                 </td>
-                <td className="border-b border-zinc-100 py-2 text-zinc-500 dark:border-zinc-900">
+                <td className="border-b border-zinc-100 py-2 pr-4 text-zinc-500 dark:border-zinc-900">
                   {cookie.expires === -1
                     ? "até fechar o navegador"
                     : "persistente"}
                 </td>
+                {twoStates && (
+                  <td className="border-b border-zinc-100 py-2 text-zinc-500 dark:border-zinc-900">
+                    {PHASES[cookie.phase ?? "pre-consent"]}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -1,0 +1,11 @@
+-- A scan now reads a store twice: untouched, and again after accepting the
+-- consent banner (CONTEXT.md, "Estado pré-consentimento" / "pós-consentimento").
+-- Every entry in `cookies` carries the state it first appeared in.
+--
+-- This column says whether there were two states to compare at all: false is a
+-- store that asked nothing, and whose cookies are therefore all pre-consent.
+--
+-- Nullable, with no backfill, because the scans that predate this were read
+-- once. Guessing a value for them would be asserting something our browser
+-- never observed, which is exactly what the scans table refuses to do.
+alter table public.scans add column consent_banner boolean;

@@ -2,10 +2,17 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/packages/supabase/server";
 
-async function authenticate(formData: FormData, signingUp: boolean) {
+async function authenticate(formData: FormData) {
   "use server";
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+
+  // Which button was pressed. A submit button's name and value ride along in the
+  // form data, so one action serves both without a second action per button.
+  // Pressing Enter submits through the first button, so the keyboard means
+  // "entrar" — the safe default, since signing up by accident sends an e-mail.
+  const signingUp = formData.get("intent") === "sign-up";
+
   const supabase = await createClient();
 
   // Where the confirmation link should come back to. Without it Supabase falls
@@ -56,7 +63,7 @@ export default async function LoginPage({
         </p>
       </div>
 
-      <form className="flex flex-col gap-3">
+      <form action={authenticate} className="flex flex-col gap-3">
         <input
           type="email"
           name="email"
@@ -88,19 +95,15 @@ export default async function LoginPage({
         )}
 
         <button
-          formAction={async (data: FormData) => {
-            "use server";
-            await authenticate(data, false);
-          }}
+          name="intent"
+          value="sign-in"
           className="rounded-lg bg-zinc-900 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
         >
           Entrar
         </button>
         <button
-          formAction={async (data: FormData) => {
-            "use server";
-            await authenticate(data, true);
-          }}
+          name="intent"
+          value="sign-up"
           className="rounded-lg border border-zinc-300 py-2 dark:border-zinc-700"
         >
           Criar conta

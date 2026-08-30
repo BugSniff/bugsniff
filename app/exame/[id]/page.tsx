@@ -5,6 +5,7 @@ import { after } from "next/server";
 import type {
   ConsentBannerState,
   ConsentPhase,
+  PolicyReading,
   ScanRejection,
 } from "@/packages/scan/scan";
 import { registrableDomain } from "@/packages/scan/third-party";
@@ -61,7 +62,7 @@ export default async function ScanPage({
   const { data: scan } = await supabase
     .from("scans")
     .select(
-      "id, url, status, cookies, requests, consent_banner, consent_platform, evidence_pre_path, evidence_post_path, failure"
+      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, evidence_pre_path, evidence_post_path, failure"
     )
     .eq("id", id)
     .maybeSingle();
@@ -174,6 +175,7 @@ export default async function ScanPage({
             consentBanner={scan.consent_banner}
             trackers={trackers ?? []}
           />
+          <Policy state={scan.policy_state} url={scan.policy_url} />
           <Timeline
             cookies={cookies}
             beforeShot={beforeShot}
@@ -431,6 +433,48 @@ function BannerNote({
       {state === "unrecognised"
         ? `${platform ? `Encontramos ${platform} nesta loja` : "Esta loja usa uma plataforma de consentimento"}, mas nosso navegador não conseguiu responder ao banner. As leituras abaixo são de antes de qualquer interação.`
         : "Nosso navegador não encontrou banner de consentimento nesta loja. Abaixo está o que ele viu."}
+    </p>
+  );
+}
+
+/**
+ * What the store says it does, and where it says it.
+ *
+ * The wording of the not-found case is the point of this whole component.
+ * "Não encontramos" is about us; "esta loja não tem política" would be about
+ * the store, and we have no standing to say that — the link may be behind a
+ * menu, in an image, or on a page we never opened.
+ */
+function Policy({
+  state,
+  url,
+}: {
+  state: PolicyReading["state"] | null;
+  url: string | null;
+}) {
+  if (!state) return null;
+
+  if (state === "found") {
+    return (
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        Política de privacidade publicada em{" "}
+        <a href={url ?? "#"} className="underline" rel="nofollow noreferrer">
+          {url}
+        </a>
+        .
+      </p>
+    );
+  }
+
+  return (
+    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      {state === "unreadable"
+        ? "Encontramos um link para a política de privacidade, mas não conseguimos ler o que ele abre."
+        : "Não encontramos a política de privacidade a partir da home desta loja."}{" "}
+      <span className="text-zinc-500">
+        Isso não quer dizer que ela não exista: quer dizer que o nosso navegador
+        não chegou nela.
+      </span>
     </p>
   );
 }

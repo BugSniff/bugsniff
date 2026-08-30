@@ -239,3 +239,33 @@ describe("a third party that writes no cookie at all", () => {
     expect(own).toEqual([]);
   });
 });
+
+describe("what the store says it does", () => {
+  test("is found through the link the store publishes", () => {
+    expect(scans.withBanner).toMatchObject({
+      ok: true,
+      policy: { state: "found" },
+    });
+  });
+
+  test("is kept as text, without the navigation around it", () => {
+    const policy = scans.withBanner.ok ? scans.withBanner.policy : null;
+    expect(policy?.state === "found" && policy.text).toContain(
+      "tratamos dados pessoais"
+    );
+    // The page carries a nav, a header and a footer with a CNPJ in it. None of
+    // that is the policy, and a finding that quoted it would be quoting the
+    // shop's phone number as if it were a commitment.
+    expect(policy?.state === "found" && policy.text).not.toContain("Carrinho");
+    expect(policy?.state === "found" && policy.text).not.toContain("CNPJ");
+  });
+
+  test("is not-found when the store links to none", () => {
+    // Which is not the same as a store without a policy — and the difference
+    // is the whole reason this state has a name of its own.
+    expect(scans.withoutBanner).toMatchObject({
+      ok: true,
+      policy: { state: "not-found" },
+    });
+  });
+});

@@ -131,10 +131,14 @@ export default async function Home({
         </form>
       )}
 
-      <p className="text-sm text-zinc-500">
+      {/* A div, not a p: a form inside a paragraph is invalid HTML, and the
+          browser silently moves it out of the paragraph while React expects it
+          to have stayed — which shows up as a hydration mismatch, far from the
+          markup that caused it. */}
+      <div className="flex gap-2 text-sm text-zinc-500">
         {user ? (
           <>
-            {user.email} ·{" "}
+            <span>{user.email} ·</span>
             <form
               action={async () => {
                 "use server";
@@ -142,20 +146,19 @@ export default async function Home({
                 await client.auth.signOut();
                 redirect("/");
               }}
-              className="inline"
             >
               <button className="underline">Sair</button>
             </form>
           </>
         ) : (
-          <>
+          <span>
             Já tem exames aqui?{" "}
             <Link href="/login" className="underline">
               Entrar
             </Link>
-          </>
+          </span>
         )}
-      </p>
+      </div>
     </main>
   );
 }

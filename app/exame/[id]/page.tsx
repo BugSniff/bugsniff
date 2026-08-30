@@ -7,6 +7,7 @@ import type {
   ConsentPhase,
   ScanRejection,
 } from "@/packages/scan/scan";
+import { nameTracker, namedTrackers, type Tracker } from "@/packages/tracker";
 import { createClient } from "@/packages/supabase/server";
 import { Watch } from "./watch";
 
@@ -94,6 +95,13 @@ export default async function ScanPage({
 
   const cookies = (scan.cookies ?? []) as Cookie[];
 
+  // Which service wrote which cookie. Read at render time, not written into the
+  // scan, so a name added to the table today names the cookies of a scan taken
+  // last week — which is the point of keeping the list as data.
+  const { data: trackers } = await supabase
+    .from("trackers")
+    .select("name, cookie_pattern");
+
   // The pre-consent state is written the moment the browser has it, so there
   // is a real reading to show while the second one is still being taken.
   const reading = waiting && cookies.length > 0;
@@ -141,7 +149,11 @@ export default async function ScanPage({
             state={scan.consent_banner}
             platform={scan.consent_platform}
           />
-          <Cookies cookies={cookies} consentBanner={scan.consent_banner} />
+          <Cookies
+            cookies={cookies}
+            consentBanner={scan.consent_banner}
+            trackers={trackers ?? []}
+          />
           <Timeline
             cookies={cookies}
             beforeShot={beforeShot}
@@ -162,16 +174,21 @@ export default async function ScanPage({
 function Cookies({
   cookies,
   consentBanner,
+  trackers,
 }: {
   cookies: Cookie[];
   /** Null on scans read before the store was read in two states. */
   consentBanner: ConsentBannerState | null;
+  trackers: Tracker[];
 }) {
   // Two states to compare only where a banner was actually answered. Anything
   // else has one reading: either nothing asked, or we could not answer it.
   const twoStates = consentBanner === "accepted";
   const before = cookies.filter((c) => c.phase !== "post-consent");
   const after = cookies.length - before.length;
+
+  // The line this whole product exists to be able to write.
+  const beforeConsent = namedTrackers(before, trackers);
 
   if (cookies.length === 0) {
     return (
@@ -191,12 +208,22 @@ function Cookies({
           : `${cookies.length} cookies gravados`}
       </h2>
 
+      {beforeConsent.length > 0 && (
+        <p className="text-sm">
+          Antes de qualquer interação com o banner, esta loja gravou cookies de{" "}
+          <strong className="font-medium">{beforeConsent.join(", ")}</strong>.
+        </p>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left text-sm">
           <thead className="text-zinc-500">
             <tr>
               <th className="border-b border-zinc-200 py-2 pr-4 font-normal dark:border-zinc-800">
                 Nome
+              </th>
+              <th className="border-b border-zinc-200 py-2 pr-4 font-normal dark:border-zinc-800">
+                Rastreador
               </th>
               <th className="border-b border-zinc-200 py-2 pr-4 font-normal dark:border-zinc-800">
                 Domínio
@@ -216,6 +243,11 @@ function Cookies({
               <tr key={`${cookie.domain}${cookie.name}`}>
                 <td className="border-b border-zinc-100 py-2 pr-4 font-mono text-xs dark:border-zinc-900">
                   {cookie.name}
+                </td>
+                <td className="border-b border-zinc-100 py-2 pr-4 dark:border-zinc-900">
+                  {nameTracker(cookie.name, trackers) ?? (
+                    <span className="text-zinc-400">não identificado</span>
+                  )}
                 </td>
                 <td className="border-b border-zinc-100 py-2 pr-4 text-zinc-500 dark:border-zinc-900">
                   {cookie.domain}

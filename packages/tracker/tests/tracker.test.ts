@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { nameTracker, namedTrackers, type Tracker } from "../index";
+import { nameCookie, nameHost, namedTrackers, type Tracker } from "../index";
 
 /**
  * The same rows the migration seeds, for the services the issue names.
@@ -9,11 +9,28 @@ import { nameTracker, namedTrackers, type Tracker } from "../index";
  * nothing to do with whether `_fbp` is a Meta Pixel.
  */
 const TRACKERS: Tracker[] = [
-  { name: "Meta Pixel", cookie_pattern: "^_fbp$|^_fbc$" },
-  { name: "Google Analytics", cookie_pattern: "^_ga|^_gid$|^_gat" },
-  { name: "Google Ads", cookie_pattern: "^_gcl_" },
-  { name: "TikTok", cookie_pattern: "^_ttp$|^_tt_|^ttcsid" },
-  { name: "Hotjar", cookie_pattern: "^_hj" },
+  {
+    name: "Meta Pixel",
+    cookie_pattern: "^_fbp$|^_fbc$",
+    host_pattern: "(^|\\.)facebook\\.(net|com)$",
+  },
+  {
+    name: "Google Analytics",
+    cookie_pattern: "^_ga|^_gid$|^_gat",
+    host_pattern: "(^|\\.)google-analytics\\.com$",
+  },
+  { name: "Google Ads", cookie_pattern: "^_gcl_", host_pattern: null },
+  {
+    name: "TikTok",
+    cookie_pattern: "^_ttp$|^_tt_|^ttcsid",
+    host_pattern: null,
+  },
+  { name: "Hotjar", cookie_pattern: "^_hj", host_pattern: null },
+  {
+    name: "Google Tag Manager",
+    cookie_pattern: null,
+    host_pattern: "(^|\\.)googletagmanager\\.com$",
+  },
 ];
 
 describe("naming what the store wrote", () => {
@@ -29,7 +46,7 @@ describe("naming what the store wrote", () => {
     ["_tt_enable_cookie", "TikTok"],
     ["_hjSessionUser_123", "Hotjar"],
   ])("%s is %s", (cookie, expected) => {
-    expect(nameTracker(cookie, TRACKERS)).toBe(expected);
+    expect(nameCookie(cookie, TRACKERS)).toBe(expected);
   });
 
   test.each([
@@ -39,27 +56,46 @@ describe("naming what the store wrote", () => {
     ["_fbpx", "close to a pixel, and not one"],
     ["my_gid", "contains a pattern, does not start with it"],
   ])("%s has no name (%s)", (cookie) => {
-    expect(nameTracker(cookie, TRACKERS)).toBeNull();
+    expect(nameCookie(cookie, TRACKERS)).toBeNull();
   });
 
   test("an unnamed cookie is null, never a guess", () => {
     // Most of what a shop writes is the shop's own. Naming those would invent
     // a fact about somebody's store, which is the one thing this cannot do.
-    expect(nameTracker("whatever_this_is", TRACKERS)).toBeNull();
+    expect(nameCookie("whatever_this_is", TRACKERS)).toBeNull();
   });
 });
 
 describe("a pattern that does not compile", () => {
   const broken: Tracker[] = [
-    { name: "Broken", cookie_pattern: "([unclosed" },
-    { name: "Meta Pixel", cookie_pattern: "^_fbp$" },
+    { name: "Broken", cookie_pattern: "([unclosed", host_pattern: null },
+    { name: "Meta Pixel", cookie_pattern: "^_fbp$", host_pattern: null },
   ];
 
   test("costs one name, not the whole report", () => {
     // The list is data, editable without a deploy. One bad row must not take
     // the report down with it.
-    expect(nameTracker("_fbp", broken)).toBe("Meta Pixel");
-    expect(nameTracker("anything", broken)).toBeNull();
+    expect(nameCookie("_fbp", broken)).toBe("Meta Pixel");
+    expect(nameCookie("anything", broken)).toBeNull();
+  });
+});
+
+describe("naming who the store talked to", () => {
+  test.each([
+    ["connect.facebook.net", "Meta Pixel"],
+    ["www.facebook.com", "Meta Pixel"],
+    ["www.google-analytics.com", "Google Analytics"],
+    ["www.googletagmanager.com", "Google Tag Manager"],
+  ])("%s is %s", (host, expected) => {
+    expect(nameHost(host, TRACKERS)).toBe(expected);
+  });
+
+  test.each([
+    ["cdn.loja.com.br", "the shop's own CDN"],
+    ["notfacebook.net", "a name that merely ends the same way"],
+    ["viacep.com.br", "a service that is not a tracker"],
+  ])("%s has no name (%s)", (host) => {
+    expect(nameHost(host, TRACKERS)).toBeNull();
   });
 });
 
@@ -73,16 +109,39 @@ describe("the services behind a reading", () => {
       { name: "_ttp" },
     ];
 
-    expect(namedTrackers(cookies, TRACKERS)).toEqual([
+    expect(namedTrackers({ cookies }, TRACKERS)).toEqual([
       "Meta Pixel",
       "Google Analytics",
       "TikTok",
     ]);
   });
 
+  test("count a service seen both ways only once", () => {
+    // The Meta Pixel that writes `_fbp` and calls connect.facebook.net is one
+    // pixel. Counting it twice would inflate every number the report prints.
+    expect(
+      namedTrackers(
+        {
+          cookies: [{ name: "_fbp" }],
+          requests: [{ host: "connect.facebook.net" }],
+        },
+        TRACKERS
+      )
+    ).toEqual(["Meta Pixel"]);
+  });
+
+  test("find the service that leaves no cookie at all", () => {
+    expect(
+      namedTrackers(
+        { requests: [{ host: "www.googletagmanager.com" }] },
+        TRACKERS
+      )
+    ).toEqual(["Google Tag Manager"]);
+  });
+
   test("are empty when the store wrote only its own", () => {
     expect(
-      namedTrackers([{ name: "cart" }, { name: "csrf" }], TRACKERS)
+      namedTrackers({ cookies: [{ name: "cart" }, { name: "csrf" }] }, TRACKERS)
     ).toEqual([]);
   });
 });

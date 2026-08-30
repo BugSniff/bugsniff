@@ -24,6 +24,14 @@ _Avoid_: conta, cliente, tenant, workspace
 Pessoa com acesso a uma organização.
 _Avoid_: usuário
 
+**Proprietário** (`Owner`):
+Membro que criou a organização e o único que pode convidar outros para ela.
+_Avoid_: dono, titular, admin
+
+**Convite** (`Invite`):
+Permissão emitida pelo proprietário para que uma pessoa se torne membro da organização. É o único caminho de entrada numa organização que a pessoa não criou.
+_Avoid_: solicitação, liberação, acesso
+
 **Lojista**:
 Papel de uma organização que administra a própria loja. Não é entidade separada.
 _Avoid_: dono, merchant, seller

@@ -37,7 +37,7 @@ export default async function LoginPage({
   const { error, enviado } = await searchParams;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-6">
+    <main className="mx-auto flex flex-1 w-full max-w-sm flex-col justify-center gap-6 px-6">
       <div>
         <h1 className="text-2xl font-semibold">bugsniff</h1>
         <p className="mt-1 text-sm text-zinc-500">

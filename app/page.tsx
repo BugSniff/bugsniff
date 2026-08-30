@@ -70,13 +70,8 @@ export default async function Home({
 }) {
   const { erro, enviado } = await searchParams;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center gap-8 px-6 py-16">
+    <main className="mx-auto flex flex-1 w-full max-w-xl flex-col justify-center gap-8 px-6 py-16">
       <div>
         <h1 className="text-2xl font-semibold">bugsniff</h1>
         <p className="mt-1 text-sm text-zinc-500">
@@ -130,35 +125,6 @@ export default async function Home({
           </p>
         </form>
       )}
-
-      {/* A div, not a p: a form inside a paragraph is invalid HTML, and the
-          browser silently moves it out of the paragraph while React expects it
-          to have stayed — which shows up as a hydration mismatch, far from the
-          markup that caused it. */}
-      <div className="flex gap-2 text-sm text-zinc-500">
-        {user ? (
-          <>
-            <span>{user.email} ·</span>
-            <form
-              action={async () => {
-                "use server";
-                const client = await createClient();
-                await client.auth.signOut();
-                redirect("/");
-              }}
-            >
-              <button className="underline">Sair</button>
-            </form>
-          </>
-        ) : (
-          <span>
-            Já tem exames aqui?{" "}
-            <Link href="/login" className="underline">
-              Entrar
-            </Link>
-          </span>
-        )}
-      </div>
     </main>
   );
 }

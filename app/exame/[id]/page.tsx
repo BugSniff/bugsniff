@@ -55,7 +55,7 @@ export default async function ScanPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-6 px-6 py-16">
+    <main className="mx-auto flex flex-1 w-full max-w-2xl flex-col justify-center gap-6 px-6 py-16">
       {waiting && <Watch scanId={scan.id} />}
 
       <div>

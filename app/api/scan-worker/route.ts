@@ -40,6 +40,32 @@ const MAX_RUNNING = 5;
 
 type Worker = { supabase: ReturnType<typeof createAdminClient> };
 
+/** Where screenshots live, guarded by the scan's own rule. */
+const EVIDENCE_BUCKET = "scan-evidence";
+
+/**
+ * Files the screenshot under the scan that produced it.
+ *
+ * Named after the scan on purpose: the storage policy resolves the object's
+ * name back to the row, so the picture is readable by exactly the people the
+ * reading is.
+ */
+async function storeEvidence(
+  { supabase }: Worker,
+  scanId: string,
+  evidence: Buffer
+): Promise<string | null> {
+  const path = `${scanId}.jpg`;
+
+  const { error } = await supabase.storage
+    .from(EVIDENCE_BUCKET)
+    .upload(path, evidence, { contentType: "image/jpeg", upsert: true });
+
+  // A scan without its screenshot is still a scan. Losing the picture is not
+  // worth losing the reading it illustrates.
+  return error ? null : path;
+}
+
 /**
  * Runs one scan, records it, then looks for the next one.
  *
@@ -60,6 +86,11 @@ async function work({ supabase }: Worker, scanId: string) {
   const scan = await runScan(row.url);
   const finishedAt = new Date().toISOString();
 
+  const evidencePath =
+    scan.ok && scan.evidence
+      ? await storeEvidence({ supabase }, scanId, scan.evidence)
+      : null;
+
   await supabase
     .from("scans")
     .update(
@@ -68,6 +99,8 @@ async function work({ supabase }: Worker, scanId: string) {
             status: "done",
             cookies: scan.cookies,
             consent_banner: scan.consentBanner,
+            consent_platform: scan.consentPlatform,
+            evidence_path: evidencePath,
             finished_at: finishedAt,
           }
         : { status: "failed", failure: scan.reason, finished_at: finishedAt }

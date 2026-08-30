@@ -6,6 +6,19 @@ import { createAdminClient } from "@/packages/supabase/admin";
 export const maxDuration = 60;
 
 /**
+ * Where the browser opens the store from. `gru1` is São Paulo.
+ *
+ * The rest of the app runs in the project's default region — `iad1`,
+ * Washington — and that is fine for rendering pages. The scan is not: a consent
+ * platform decides whether to show its banner by the visitor's country, so a
+ * store that only asks Brazilians would never be asked to ask us, and the exam
+ * would come back clean by accident. It is the measurement's own address.
+ *
+ * Only this route moves, so nothing else pays the distance.
+ */
+export const preferredRegion = "gru1";
+
+/**
  * The most scans allowed to run at once.
  *
  * Not a capacity limit — Vercel would run far more without noticing. It is a
@@ -51,7 +64,12 @@ async function work({ supabase }: Worker, scanId: string) {
     .from("scans")
     .update(
       scan.ok
-        ? { status: "done", cookies: scan.cookies, finished_at: finishedAt }
+        ? {
+            status: "done",
+            cookies: scan.cookies,
+            consent_banner: scan.consentBanner,
+            finished_at: finishedAt,
+          }
         : { status: "failed", failure: scan.reason, finished_at: finishedAt }
     )
     .eq("id", scanId);

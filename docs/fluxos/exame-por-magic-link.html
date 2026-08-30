@@ -310,8 +310,10 @@ sequenceDiagram
 
     Note over F: Guarda 3 — N workers<br/>o teto de gasto é o número de workers,<br/>nunca o tamanho da fila
 
-    F->>L: abre a loja no Chromium
-    L-->>F: cookies gravados
+    F->>L: abre a loja no Chromium, sem tocar em nada
+    L-->>F: estado pré-consentimento
+    F->>L: aceita o banner e abre de novo
+    L-->>F: estado pós-consentimento
     F->>S: grava o exame com a organização
     S-->>P: Realtime empurra o resultado
 </pre>

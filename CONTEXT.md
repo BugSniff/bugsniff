@@ -2,7 +2,15 @@
 
 Auditoria de conformidade LGPD para loja virtual brasileira: observa o que a loja realmente faz com dados do visitante, compara com o que ela declara fazer, e aponta onde as duas coisas divergem.
 
-O domínio é brasileiro e jurídico, então os termos canônicos são em português. O identificador em código aparece entre parênteses.
+O domínio é brasileiro e jurídico, então os termos canônicos deste glossário são
+em português, e os documentos do repositório também (ADRs, READMEs, issues,
+commits).
+
+**O código, porém, é inteiramente em inglês** — identificadores, comentários e
+literais. O identificador canônico de cada termo aparece entre parênteses abaixo
+e é o nome a usar no código. A exceção são dados que _são_ texto em português,
+como a lista de linguagem proibida: esses continuam em português porque é o
+idioma que o produto escreve.
 
 ## Language
 
@@ -95,4 +103,4 @@ O produto relata fatos e cita normas; nunca conclui sobre a situação jurídica
 
 irregular · em desacordo · violação · infração · ilegal · multa · penalidade · sujeito a sanção · não conforme · risco jurídico · você deve · obrigatório
 
-A construção permitida é sempre *fato observado* mais *norma citada com o trecho de origem*, deixando a conclusão para quem tem competência de concluir.
+A construção permitida é sempre _fato observado_ mais _norma citada com o trecho de origem_, deixando a conclusão para quem tem competência de concluir.

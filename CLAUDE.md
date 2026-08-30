@@ -14,6 +14,12 @@ The five canonical triage roles, each label string equal to its name. See `docs/
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Idioma
+
+Código é inteiramente em inglês: nomes de função, constantes, tipos, comentários
+e literais. Documentos (`CONTEXT.md`, ADRs, READMEs, issues, commits) são em
+português. Ver a nota de idioma no topo do `CONTEXT.md`.
+
 ### Pacotes
 
 Pacotes são módulos profundos: importe apenas pelos entry points (arquivos na

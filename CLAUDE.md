@@ -14,6 +14,16 @@ The five canonical triage roles, each label string equal to its name. See `docs/
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Artefatos visuais
+
+Pedido de artefato, diagrama, página ou mockup vira **arquivo HTML em
+`docs/`** — versionado, revisável em PR, e vivo enquanto o repositório viver.
+Nunca publicar como artefato hospedado do Claude: o link morre fora do nosso
+controle e leva junto toda referência que apontava para ele.
+
+Diagramas em mermaid, com a biblioteca carregada por CDN no próprio arquivo.
+Fluxos ficam em `docs/fluxos/`.
+
 ### Idioma
 
 Código é inteiramente em inglês: nomes de função, constantes, tipos, comentários

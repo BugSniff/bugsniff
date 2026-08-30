@@ -11,3 +11,9 @@ function required(name: string): string {
 
 export const supabaseUrl = () => required("NEXT_PUBLIC_SUPABASE_URL");
 export const supabaseAnonKey = () => required("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+
+/**
+ * Deliberately not `NEXT_PUBLIC_`. The prefix is what ships a value to the
+ * browser, and this one bypasses RLS — the naming is the guardrail.
+ */
+export const serviceRoleKey = () => required("SUPABASE_SERVICE_ROLE_KEY");

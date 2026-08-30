@@ -52,7 +52,7 @@ const EVIDENCE_BUCKET = "scan-evidence";
 async function storeEvidence(
   { supabase }: Worker,
   scanId: string,
-  reading: ConsentPhase,
+  reading: ConsentPhase | "blocked",
   evidence: Buffer | null
 ): Promise<string | null> {
   if (!evidence) return null;
@@ -122,7 +122,20 @@ async function work({ supabase }: Worker, scanId: string) {
             ),
             finished_at: finishedAt,
           }
-        : { status: "failed", failure: scan.reason, finished_at: finishedAt }
+        : {
+            status: "failed",
+            failure: scan.reason,
+            // A store that refused us still showed our browser something, and
+            // that picture is the only way anyone tells "we were turned away"
+            // from "there was nothing to find".
+            evidence_pre_path: await storeEvidence(
+              { supabase },
+              scanId,
+              "blocked",
+              scan.evidence ?? null
+            ),
+            finished_at: finishedAt,
+          }
     )
     .eq("id", scanId);
 

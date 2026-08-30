@@ -18,6 +18,8 @@ const FAILURES: Record<ScanRejection, string> = {
   unresolvable: "Não encontramos esse endereço.",
   "private-address": "Esse endereço não é público.",
   unreachable: "A loja não respondeu a tempo. Pode estar fora do ar.",
+  blocked:
+    "A loja respondeu ao nosso navegador com uma página de erro, não com a loja. Não é um exame limpo: é um exame que não aconteceu.",
 };
 
 /** `phase` is absent on scans read before the two states existed. */
@@ -117,10 +119,20 @@ export default async function ScanPage({
       )}
 
       {scan.status === "failed" && (
-        <p role="alert" className="text-sm text-red-600">
-          {FAILURES[scan.failure as ScanRejection] ??
-            "O exame não pôde ser concluído."}
-        </p>
+        <>
+          <p role="alert" className="text-sm text-red-600">
+            {FAILURES[scan.failure as ScanRejection] ??
+              "O exame não pôde ser concluído."}
+          </p>
+          {beforeShot && (
+            <Shot
+              url={beforeShot}
+              title="A tela que nosso navegador recebeu"
+              detail="no lugar da loja"
+              alt="A página de erro que a loja devolveu ao nosso navegador"
+            />
+          )}
+        </>
       )}
 
       {(scan.status === "done" || reading) && (

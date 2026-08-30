@@ -48,6 +48,8 @@ pnpm check             # typecheck + fronteiras + testes (roda no pre-commit)
 
 Violação é `error`, não aviso: o commit não entra.
 
-`packages/example/` é um template para copiar ou apagar. Regras de camada (quais
-pacotes podem depender de quais) são outra preocupação e estão como stub
-comentado em `.dependency-cruiser.cjs`.
+`finding-validator/` serve de referência da forma: entry point fino na raiz,
+implementação em `lib/`, testes em `tests/` importando só o entry point.
+
+Regras de camada (quais pacotes podem depender de quais) são outra preocupação e
+estão como stub comentado em `.dependency-cruiser.cjs`.

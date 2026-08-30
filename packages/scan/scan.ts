@@ -188,7 +188,16 @@ export async function observeStore(url: URL): Promise<Scan> {
 
     // A fresh context per scan, so one store never sees another store's
     // cookies — and so the reading is of this store alone.
-    const context = await browser.newContext();
+    //
+    // Brazilian store, Brazilian visitor. A context with no options presents
+    // itself as en-US on UTC, and that changes what is being measured: a
+    // consent platform configured for Brazil may not show its banner to that
+    // visitor at all, and a store that serves English to it may not even write
+    // the word the accept control is matched by.
+    const context = await browser.newContext({
+      locale: "pt-BR",
+      timezoneId: "America/Sao_Paulo",
+    });
     const page = await context.newPage();
 
     await load(page, url);

@@ -53,6 +53,11 @@ const names = (scan: Scan, phase: ObservedCookie["phase"]) =>
     ? scan.cookies.filter((c) => c.phase === phase).map((c) => c.name)
     : [];
 
+const hosts = (scan: Scan, phase: ObservedCookie["phase"]) =>
+  scan.ok
+    ? scan.requests.filter((r) => r.phase === phase).map((r) => r.host)
+    : [];
+
 describe("a banner with real buttons", () => {
   test("is accepted, and the store is read in two states", () => {
     expect(scans.withBanner).toMatchObject({
@@ -159,6 +164,12 @@ describe("the first half of the reading", () => {
     );
   });
 
+  test("carries the third parties reached before any interaction", () => {
+    expect(handedOver[0].requests.map((r) => r.host)).toContain(
+      "pixel-before.example"
+    );
+  });
+
   test("carries only what was true before any interaction", () => {
     expect(handedOver[0].cookies.every((c) => c.phase === "pre-consent")).toBe(
       true
@@ -193,5 +204,38 @@ describe("a store that refuses our browser", () => {
     expect(
       !scans.refusing.ok && scans.refusing.evidence?.length
     ).toBeGreaterThan(0);
+  });
+});
+
+describe("a third party that writes no cookie at all", () => {
+  test("is seen before consent, where it would have been invisible", () => {
+    // A pixel fired by image leaves nothing behind. Until requests were
+    // observed, a store doing only this came back with an empty table.
+    expect(hosts(scans.withBanner, "pre-consent")).toContain(
+      "pixel-before.example"
+    );
+  });
+
+  test("is placed in the reading it belongs to", () => {
+    expect(hosts(scans.withBanner, "post-consent")).toContain(
+      "pixel-after.example"
+    );
+    expect(hosts(scans.withBanner, "post-consent")).not.toContain(
+      "pixel-before.example"
+    );
+  });
+
+  test("has no post-consent half in a store that asks nothing", () => {
+    expect(hosts(scans.withoutBanner, "pre-consent")).toContain(
+      "pixel-before.example"
+    );
+    expect(hosts(scans.withoutBanner, "post-consent")).toEqual([]);
+  });
+
+  test("never includes the store's own host", () => {
+    const own = scans.withBanner.ok
+      ? scans.withBanner.requests.filter((r) => r.host === "127.0.0.1")
+      : [];
+    expect(own).toEqual([]);
   });
 });

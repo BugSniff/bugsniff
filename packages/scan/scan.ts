@@ -8,6 +8,7 @@ import {
   acceptConsentBanner,
   detectConsentPlatform,
 } from "./lib/consent-banner";
+import { thirdPartyHosts } from "./third-party";
 import { parseTargetUrl, type TargetRejection } from "./target-url";
 
 /**
@@ -59,7 +60,20 @@ export type Evidence = {
  */
 export type PreConsentReading = {
   cookies: ObservedCookie[];
+  requests: ObservedRequest[];
   evidence: Buffer | null;
+};
+
+/**
+ * A third party the store's page talked to, and when.
+ *
+ * The host alone, never the URL: the path and the query carry the visitor's
+ * own identifiers, and an audit that collects those to prove somebody else
+ * collects them has lost its own argument.
+ */
+export type ObservedRequest = {
+  host: string;
+  phase: ConsentPhase;
 };
 
 /** A cookie the store's page left behind, as the browser saw it. */
@@ -89,6 +103,7 @@ export type Scan =
       consentPlatform: string | null;
       evidence: Evidence;
       cookies: ObservedCookie[];
+      requests: ObservedRequest[];
     }
   | {
       ok: false;
@@ -204,6 +219,9 @@ type BrowserCookie = {
   secure: boolean;
 };
 
+const asRequests = (hosts: string[], phase: ConsentPhase): ObservedRequest[] =>
+  hosts.map((host) => ({ host, phase }));
+
 const observed = (
   cookies: BrowserCookie[],
   phase: ConsentPhase
@@ -247,6 +265,13 @@ export async function observeStore(
     });
     const page = await context.newPage();
 
+    // Every URL the page reaches for, from the first byte. Requests are the
+    // half of "tracker" that leaves nothing behind: a pixel fired by image or
+    // by `sendBeacon` writes no cookie at all, and today the store that only
+    // does that comes back with an empty table.
+    const reached = new Set<string>();
+    page.on("request", (request) => reached.add(request.url()));
+
     if (!(await load(page, url)).isStore) {
       // Not a clean store: a store we did not read. Saying "no cookies were
       // written" about a page that is not the shop would be the most flattering
@@ -259,6 +284,7 @@ export async function observeStore(
     }
 
     const beforeConsent = await context.cookies();
+    const beforeHosts = thirdPartyHosts(reached, url);
     const beforeScreen = await screenshot(page);
 
     // Handed over before the banner search, which is the slow part. Whoever is
@@ -266,6 +292,7 @@ export async function observeStore(
     // twenty-five, and the state that matters most is the one they get first.
     await onPreConsent?.({
       cookies: observed(beforeConsent, "pre-consent"),
+      requests: asRequests(beforeHosts, "pre-consent"),
       evidence: beforeScreen,
     }).catch(() => {
       // The screen missing an early update is not worth losing the scan over.
@@ -295,6 +322,7 @@ export async function observeStore(
         consentPlatform: platform,
         evidence: { preConsent: beforeScreen, postConsent: null },
         cookies: observed(beforeConsent, "pre-consent"),
+        requests: asRequests(beforeHosts, "pre-consent"),
       };
     }
 
@@ -306,6 +334,11 @@ export async function observeStore(
     const afterConsent = await context.cookies();
     const afterScreen = await screenshot(page);
 
+    const seenHosts = new Set(beforeHosts);
+    const afterHosts = thirdPartyHosts(reached, url).filter(
+      (host) => !seenHosts.has(host)
+    );
+
     const alreadySeen = new Set(beforeConsent.map(cookieKey));
 
     return {
@@ -315,6 +348,10 @@ export async function observeStore(
       consentBanner: "accepted",
       consentPlatform: platform,
       evidence: { preConsent: beforeScreen, postConsent: afterScreen },
+      requests: [
+        ...asRequests(beforeHosts, "pre-consent"),
+        ...asRequests(afterHosts, "post-consent"),
+      ],
       cookies: [
         ...observed(beforeConsent, "pre-consent"),
         ...observed(

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { parseTargetUrl } from "@/packages/scan/target-url";
 import { createAdminClient } from "@/packages/supabase/admin";
 import { createClient } from "@/packages/supabase/server";
@@ -16,47 +17,89 @@ const REFUSALS: Record<string, string> = {
     "Esse endereço não é público, então não há o que examinar.",
 };
 
+const NOT_RECORDED = "Não conseguimos registrar o exame. Tente de novo.";
+
+/** Nudges the queue after the response is sent, so nobody waits on a browser. */
+async function kickQueue() {
+  const origin = (await headers()).get("origin");
+  after(() =>
+    fetch(`${origin}/api/scan-worker`, { method: "POST" }).catch(() => {
+      // The waiting screen tries again on its next render.
+    })
+  );
+}
+
 /**
- * Parks a scan and sends the link that will release it.
+ * Starts a scan.
  *
- * Nothing expensive happens here on purpose. The URL is checked — cheap, and it
- * catches a typo before costing anyone an e-mail — and then stored against a
- * scan that is explicitly *not* queued. No browser starts until someone clicks
- * a link that arrived in the inbox they claimed.
+ * Two paths, and the only difference is whether the gate still has anything to
+ * prove. The gate exists to establish that whoever asked owns the address they
+ * typed — and a live session already established exactly that. Asking again is
+ * friction that also spends a magic link to reconfirm something confirmed.
  *
- * The URL does not travel inside the e-mail: a link the recipient can edit would
- * let them point the scan somewhere else with the gate already passed. The link
- * carries the scan's claim token, and the URL stays in the row.
+ * Signed in, the scan is queued at once and the person goes straight to it.
+ * Signed out, the scan is parked and clicking the link in the inbox releases it.
  */
 async function requestScan(formData: FormData) {
   "use server";
-  const rawUrl = String(formData.get("url") ?? "");
-  const email = String(formData.get("email") ?? "");
 
-  const target = await parseTargetUrl(rawUrl);
+  const target = await parseTargetUrl(String(formData.get("url") ?? ""));
   if (!target.ok) {
     redirect(`/?erro=${encodeURIComponent(REFUSALS[target.reason])}`);
   }
 
-  const { data: scan } = await createAdminClient()
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    // RLS scopes this to the caller, so it is always their own.
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("id")
+      .maybeSingle();
+
+    if (!organization) {
+      redirect(
+        `/?erro=${encodeURIComponent("Sua conta não está ligada a nenhuma organização.")}`
+      );
+    }
+
+    const { data: scan } = await createAdminClient()
+      .from("scans")
+      .insert({
+        url: target.url.href,
+        organization_id: organization.id,
+        status: "pending",
+        pending_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (!scan) redirect(`/?erro=${encodeURIComponent(NOT_RECORDED)}`);
+
+    await kickQueue();
+    redirect(`/exame/${scan.id}`);
+  }
+
+  // Nobody signed in: park the URL and let the inbox release it. The URL does
+  // not travel inside the e-mail — a link the recipient could edit would point
+  // the scan elsewhere with the gate already passed — so the link carries the
+  // claim token and the URL stays in the row.
+  const { data: parked } = await createAdminClient()
     .from("scans")
     .insert({ url: target.url.href })
     .select("claim_token")
     .single();
 
-  if (!scan) {
-    redirect(
-      `/?erro=${encodeURIComponent("Não conseguimos registrar o exame. Tente de novo.")}`
-    );
-  }
+  if (!parked) redirect(`/?erro=${encodeURIComponent(NOT_RECORDED)}`);
 
   const origin = (await headers()).get("origin");
-  const supabase = await createClient();
-
   const { error } = await supabase.auth.signInWithOtp({
-    email,
+    email: String(formData.get("email") ?? ""),
     options: {
-      emailRedirectTo: `${origin}/auth/callback?scan=${scan.claim_token}`,
+      emailRedirectTo: `${origin}/auth/callback?scan=${parked.claim_token}`,
     },
   });
 
@@ -71,8 +114,13 @@ export default async function Home({
 }) {
   const { erro, enviado } = await searchParams;
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
-    <main className="mx-auto flex flex-1 w-full max-w-xl flex-col justify-center gap-8 px-6 py-16">
+    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-8 px-6 py-16">
       <div>
         <h1 className="text-2xl font-semibold">bugsniff</h1>
         <p className="mt-1 text-sm text-zinc-500">
@@ -100,15 +148,18 @@ export default async function Home({
             aria-label="Endereço da loja"
             className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
           />
-          <input
-            type="email"
-            name="email"
-            required
-            autoComplete="email"
-            placeholder="seu@email.com"
-            aria-label="Seu e-mail"
-            className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
+
+          {!user && (
+            <input
+              type="email"
+              name="email"
+              required
+              autoComplete="email"
+              placeholder="seu@email.com"
+              aria-label="Seu e-mail"
+              className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          )}
 
           {erro && (
             <p role="alert" className="text-sm text-red-600">
@@ -117,16 +168,18 @@ export default async function Home({
           )}
 
           <SubmitButton
-            working="Enviando o link…"
+            working={user ? "Começando…" : "Enviando o link…"}
             className="rounded-lg bg-zinc-900 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
           >
             Examinar
           </SubmitButton>
 
-          <p className="text-xs text-zinc-500">
-            Mandamos o resultado por um link no seu e-mail. Sem senha: o link é
-            a sua entrada.
-          </p>
+          {!user && (
+            <p className="text-xs text-zinc-500">
+              Mandamos o resultado por um link no seu e-mail. Sem senha: o link
+              é a sua entrada.
+            </p>
+          )}
         </form>
       )}
     </main>

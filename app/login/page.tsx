@@ -37,6 +37,15 @@ export default async function LoginPage({
 }) {
   const { error, enviado } = await searchParams;
 
+  // Someone already signed in has nothing to do here, and sending them a link
+  // to prove what the session already proves only spends quota.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) redirect("/");
+
   return (
     <main className="mx-auto flex flex-1 w-full max-w-sm flex-col justify-center gap-6 px-6">
       <div>

@@ -7,6 +7,7 @@ import type {
   ConsentPhase,
   ScanRejection,
 } from "@/packages/scan/scan";
+import { registrableDomain } from "@/packages/scan/third-party";
 import {
   nameCookie,
   nameHost,
@@ -297,20 +298,38 @@ function BeforeConsent({
   requests: Request[];
   trackers: Tracker[];
 }) {
-  const named = namedTrackers(
-    {
-      cookies: cookies.filter((c) => c.phase !== "post-consent"),
-      requests: requests.filter((r) => r.phase !== "post-consent"),
-    },
-    trackers
+  const before = {
+    cookies: cookies.filter((c) => c.phase !== "post-consent"),
+    requests: requests.filter((r) => r.phase !== "post-consent"),
+  };
+
+  const named = namedTrackers(before, trackers);
+
+  // The third parties we cannot put a name to, counted by who they are rather
+  // than by how many addresses they answer on. Kept in the sentence on purpose:
+  // the gap is ours, and hiding it would make the reading look more complete
+  // than it is.
+  const unnamed = new Set(
+    before.requests
+      .filter((r) => !nameHost(r.host, trackers))
+      .map((r) => registrableDomain(r.host))
   );
 
-  if (named.length === 0) return null;
+  const others =
+    unnamed.size > 0
+      ? `${unnamed.size} ${unnamed.size === 1 ? "outro terceiro que não sabemos nomear" : "outros terceiros que não sabemos nomear"}`
+      : null;
+
+  if (named.length === 0 && !others) return null;
 
   return (
     <p className="text-sm">
       Antes de qualquer interação com o banner, esta loja acionou{" "}
-      <strong className="font-medium">{named.join(", ")}</strong>.
+      {named.length > 0 && (
+        <strong className="font-medium">{named.join(", ")}</strong>
+      )}
+      {named.length > 0 && others ? ", e mais " : ""}
+      {others}.
     </p>
   );
 }
@@ -365,8 +384,15 @@ function Requests({
                   {request.host}
                 </td>
                 <td className="border-b border-zinc-100 py-2 pr-4 dark:border-zinc-900">
+                  {/* Without a name in the table, the domain is still an
+                      identity: `track.titanpush.com` is titanpush.com, and
+                      saying so beats "não identificado", which throws away
+                      what we already know. Muted, because knowing who received
+                      the data is not the same as knowing which product it is. */}
                   {nameHost(request.host, trackers) ?? (
-                    <span className="text-zinc-400">não identificado</span>
+                    <span className="text-zinc-500">
+                      {registrableDomain(request.host)}
+                    </span>
                   )}
                 </td>
                 {twoStates && (

@@ -7,20 +7,30 @@ async function authenticate(formData: FormData, signingUp: boolean) {
   const password = String(formData.get("password") ?? "");
   const supabase = await createClient();
 
-  const { error } = signingUp
+  const { data, error } = signingUp
     ? await supabase.auth.signUp({ email, password })
     : await supabase.auth.signInWithPassword({ email, password });
 
   if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
+
+  // Signing up only returns a session when the project auto-confirms e-mail.
+  // It does not, so say so: otherwise this lands back on a logged-out home page
+  // with no explanation and the person tries again.
+  if (!data.session) {
+    redirect(
+      `/login?message=${encodeURIComponent("Confirme seu e-mail para entrar. O link está na sua caixa de entrada.")}`
+    );
+  }
+
   redirect("/");
 }
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; message?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, message } = await searchParams;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-6">
@@ -53,6 +63,12 @@ export default async function LoginPage({
         {error && (
           <p role="alert" className="text-sm text-red-600">
             {error}
+          </p>
+        )}
+
+        {message && (
+          <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
+            {message}
           </p>
         )}
 

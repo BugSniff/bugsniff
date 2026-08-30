@@ -14,6 +14,12 @@ The five canonical triage roles, each label string equal to its name. See `docs/
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Pacotes
+
+Pacotes são módulos profundos: importe apenas pelos entry points (arquivos na
+raiz do pacote). Leia [packages/README.md](./packages/README.md) antes de criar
+ou importar um.
+
 ### AGENTS.md
 
 Gerado e re-adicionado automaticamente pelo `next dev` — não editar à mão. As

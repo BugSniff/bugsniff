@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
-/** Routes that launch a browser, and therefore need its binaries shipped. */
-const SCAN_ROUTE = "/";
+/**
+ * The route that launches a browser, and therefore needs its binaries shipped.
+ *
+ * This key follows the scan. It used to be `/`, back when pasting a URL ran the
+ * browser during the page render; the worker owns that now. Point it at a route
+ * that no longer opens Chromium and the build still passes — the failure only
+ * shows up in production, as "cannot find module".
+ */
+const SCAN_ROUTE = "/api/scan-worker";
 
 const nextConfig: NextConfig = {
   // Both packages find their binaries by walking relative paths at runtime.

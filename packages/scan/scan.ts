@@ -4,6 +4,10 @@ import {
   type Browser,
   type Page,
 } from "playwright-core";
+import {
+  acceptConsentBanner,
+  detectConsentPlatform,
+} from "./lib/consent-banner";
 import { parseTargetUrl, type TargetRejection } from "./target-url";
 
 /**
@@ -14,6 +18,22 @@ import { parseTargetUrl, type TargetRejection } from "./target-url";
  * before any interaction is the fact the audit exists to observe.
  */
 export type ConsentPhase = "pre-consent" | "post-consent";
+
+/**
+ * What the scan can honestly say about the banner.
+ *
+ * Three, not two. "We did not click" used to cover two opposite facts — the
+ * store that asks nothing, and the banner we could not answer — and the second
+ * one came out looking like a clean result, which is the worst shape an error
+ * can take in an audit.
+ */
+export type ConsentBannerState =
+  /** Found and accepted. The only one confirmed by interaction. */
+  | "accepted"
+  /** Something asks, and the scan could not answer it. Not a finding: a queue. */
+  | "unrecognised"
+  /** Our browser found nothing that asks. The screenshot is what backs it. */
+  | "not-found";
 
 /** A cookie the store's page left behind, as the browser saw it. */
 export type ObservedCookie = {
@@ -33,13 +53,17 @@ export type Scan =
       ok: true;
       url: string;
       at: string;
+      consentBanner: ConsentBannerState;
+      /** The consent platform whose trace was found, when one was. */
+      consentPlatform: string | null;
       /**
-       * Whether a consent banner answered the scan.
+       * JPEG of the store as it stood before any interaction.
        *
-       * False means the store has one state, not two: nothing was asked, so
-       * nothing was consented to, and every cookie is a pre-consent cookie.
+       * Kept only when the scan could not accept, because that is when what it
+       * reports needs a human to be able to check it. Only the picture confirms
+       * "this store asks nothing" — the machine can only say it did not find.
        */
-      consentBanner: boolean;
+      evidence: Buffer | null;
       cookies: ObservedCookie[];
     }
   | { ok: false; reason: ScanRejection };
@@ -56,33 +80,21 @@ const NAVIGATION_TIMEOUT_MS = 20_000;
 const SETTLE_MS = 3_000;
 
 /**
- * How long to wait for a banner before calling the store bannerless.
+ * How long to look for a banner when nothing says one is coming.
  *
- * Banners are injected by a third-party script, so they show up later than the
- * page does. Waiting is what separates "this store asks nothing" from "the scan
- * was faster than the banner", and getting that wrong turns a store that
- * behaves into a store that appears not to.
+ * Spent on every store that has no banner at all, which is most of them, so it
+ * stays short.
  */
-const BANNER_TIMEOUT_MS = 5_000;
+const BANNER_BUDGET_MS = 5_000;
 
 /**
- * What the control that accepts everything says.
+ * And how long when a consent platform's trace says one is coming.
  *
- * Anchored at the start, which is what keeps "Rejeitar", "Configurar" and
- * "Gerenciar preferencias" out: none of them open with an accepting word.
+ * Worth four times the wait, because here there is evidence it will pay: the
+ * machinery is installed, so a banner not showing up yet is more likely to be
+ * slow than absent.
  */
-const ACCEPTS =
-  /^\s*(aceitar|aceito|concordo|permitir|autorizar|entendi|accept|allow|agree|got it|ok)\b/i;
-
-/**
- * An accept that accepts only part of it.
- *
- * "Aceitar apenas os necessários" opens with an accepting word and is the
- * refusal. Clicking it would produce a post-consent state in which nothing
- * fired, and report a store that tracks as a store that does not.
- */
-const ACCEPTS_ONLY_SOME =
-  /necess|essenci|obrigat|apenas|somente|only|selecion/i;
+const BANNER_BUDGET_WITH_PLATFORM_MS = 20_000;
 
 /**
  * Opens a browser wherever this happens to be running.
@@ -122,32 +134,6 @@ async function load(page: Page, url: URL) {
   await page.waitForTimeout(SETTLE_MS);
 }
 
-/**
- * Clicks the banner's accept, and reports whether there was one to click.
- *
- * ponytail: matches by role and accessible name, so a banner built out of
- * `<div onclick>` with no role, or one living inside an iframe, reads as no
- * banner at all. Both are common enough in consent platforms to be worth
- * closing — with a per-vendor selector list (OneTrust, Cookiebot, Osano) — once
- * the scan has met enough real stores to know which vendors actually show up.
- */
-async function acceptConsentBanner(page: Page): Promise<boolean> {
-  const accept = page
-    .getByRole("button", { name: ACCEPTS })
-    .or(page.getByRole("link", { name: ACCEPTS }))
-    .filter({ hasNotText: ACCEPTS_ONLY_SOME })
-    .first();
-
-  try {
-    await accept.click({ timeout: BANNER_TIMEOUT_MS });
-    return true;
-  } catch {
-    // Nothing to accept: no banner, or one this scan cannot recognise. Either
-    // way the store is read as a single state rather than as a failure.
-    return false;
-  }
-}
-
 /** Identity of a cookie across the two readings — a store may reset its value. */
 const cookieKey = (cookie: { name: string; domain: string }) =>
   `${cookie.domain} ${cookie.name}`;
@@ -179,7 +165,7 @@ const observed = (
  * The URL must already have been through `parseTargetUrl` — this drives a real
  * browser from inside our own network, and that guard is what keeps a stranger
  * from pointing it at the cloud metadata endpoint. Exported for the fixture
- * test, which serves a store on loopback that the guard would rightly refuse.
+ * tests, which serve stores on loopback that the guard would rightly refuse.
  */
 export async function observeStore(url: URL): Promise<Scan> {
   let browser: Browser | undefined;
@@ -203,12 +189,31 @@ export async function observeStore(url: URL): Promise<Scan> {
     await load(page, url);
     const beforeConsent = await context.cookies();
 
-    if (!(await acceptConsentBanner(page))) {
+    const platform = await detectConsentPlatform(
+      page,
+      beforeConsent.map(({ name }) => name)
+    );
+
+    const banner = await acceptConsentBanner(
+      page,
+      platform ? BANNER_BUDGET_WITH_PLATFORM_MS : BANNER_BUDGET_MS
+    );
+
+    const at = new Date().toISOString();
+
+    if (!banner.accepted) {
+      // Nothing was clicked, so the page still stands where a visitor finds
+      // it. The screenshot is of exactly that: the store as it looks while it
+      // has already written whatever it wrote.
       return {
         ok: true,
         url: url.href,
-        at: new Date().toISOString(),
-        consentBanner: false,
+        at,
+        consentBanner: banner.found || platform ? "unrecognised" : "not-found",
+        consentPlatform: platform,
+        evidence: await page
+          .screenshot({ type: "jpeg", quality: 60 })
+          .catch(() => null),
         cookies: observed(beforeConsent, "pre-consent"),
       };
     }
@@ -225,8 +230,10 @@ export async function observeStore(url: URL): Promise<Scan> {
     return {
       ok: true,
       url: url.href,
-      at: new Date().toISOString(),
-      consentBanner: true,
+      at,
+      consentBanner: "accepted",
+      consentPlatform: platform,
+      evidence: null,
       cookies: [
         ...observed(beforeConsent, "pre-consent"),
         ...observed(

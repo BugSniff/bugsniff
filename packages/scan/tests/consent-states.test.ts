@@ -3,23 +3,28 @@ import { observeStore, type ObservedCookie, type Scan } from "../scan";
 import { startFixtureStore, type FixtureStore } from "./fixture-store";
 
 /**
- * Both readings happen once, in parallel, and every test asserts on them.
+ * Every shape is read once, in parallel, and the tests assert on the results.
  *
- * Each reading costs two page loads plus the settle the scan waits out, and
- * `pnpm check` runs on every commit. Reading the two fixtures at the same time
- * is the difference between a hook that pauses and one that stalls.
+ * Each reading costs a page load plus the settle the scan waits out, and
+ * `pnpm check` runs on every commit. Reading the fixtures at the same time is
+ * the difference between a hook that pauses and one that stalls.
  */
 let store: FixtureStore;
-let withBanner: Scan;
-let withoutBanner: Scan;
+const scans: Record<string, Scan> = {};
 
 beforeAll(async () => {
   store = await startFixtureStore();
-  [withBanner, withoutBanner] = await Promise.all([
-    observeStore(store.withBanner),
-    observeStore(store.withoutBanner),
-  ]);
-}, 60_000);
+  const shapes = [
+    ["withBanner", store.withBanner],
+    ["homemade", store.homemade],
+    ["inIframe", store.inIframe],
+    ["unclickable", store.unclickable],
+    ["withoutBanner", store.withoutBanner],
+  ] as const;
+
+  const results = await Promise.all(shapes.map(([, url]) => observeStore(url)));
+  shapes.forEach(([name], index) => (scans[name] = results[index]));
+}, 120_000);
 
 afterAll(() => store?.close());
 
@@ -28,18 +33,23 @@ const names = (scan: Scan, phase: ObservedCookie["phase"]) =>
     ? scan.cookies.filter((c) => c.phase === phase).map((c) => c.name)
     : [];
 
-describe("a store that shows a banner", () => {
-  test("is read in two states", () => {
-    expect(withBanner).toMatchObject({ ok: true, consentBanner: true });
+describe("a banner with real buttons", () => {
+  test("is accepted, and the store is read in two states", () => {
+    expect(scans.withBanner).toMatchObject({
+      ok: true,
+      consentBanner: "accepted",
+    });
   });
 
   test("reports the tracker that fired before anything was asked", () => {
-    expect(names(withBanner, "pre-consent")).toContain("fixture_analytics");
+    expect(names(scans.withBanner, "pre-consent")).toContain(
+      "fixture_analytics"
+    );
   });
 
   test("reports as post-consent only what the acceptance brought", () => {
-    expect(names(withBanner, "post-consent")).toContain("fixture_pixel");
-    expect(names(withBanner, "post-consent")).not.toContain(
+    expect(names(scans.withBanner, "post-consent")).toContain("fixture_pixel");
+    expect(names(scans.withBanner, "post-consent")).not.toContain(
       "fixture_analytics"
     );
   });
@@ -47,17 +57,74 @@ describe("a store that shows a banner", () => {
   test("accepts everything, not the refusal that opens with 'Aceitar'", () => {
     // "Aceitar apenas os necessários" sits first in the banner and never sets
     // the pixel. Its presence in the post-consent state is the whole check.
-    expect(names(withBanner, "post-consent")).toContain("fixture_pixel");
+    expect(names(scans.withBanner, "post-consent")).toContain("fixture_pixel");
+  });
+});
+
+describe("a homemade banner, with no vendor and no button element", () => {
+  test("is found by its shape and accepted", () => {
+    expect(scans.homemade).toMatchObject({
+      ok: true,
+      consentBanner: "accepted",
+    });
+    expect(names(scans.homemade, "post-consent")).toContain("fixture_pixel");
+  });
+});
+
+describe("a banner inside an iframe", () => {
+  test("is found there and accepted", () => {
+    expect(scans.inIframe).toMatchObject({
+      ok: true,
+      consentBanner: "accepted",
+    });
+    expect(names(scans.inIframe, "post-consent")).toContain("fixture_pixel");
+  });
+});
+
+describe("a banner the scan cannot answer", () => {
+  test("is reported as unrecognised, never as a store that asks nothing", () => {
+    expect(scans.unclickable).toMatchObject({
+      ok: true,
+      consentBanner: "unrecognised",
+    });
+  });
+
+  test("names the platform whose trace is on the page", () => {
+    expect(scans.unclickable).toMatchObject({ consentPlatform: "IAB TCF" });
+  });
+
+  test("keeps a screenshot, because only a picture confirms this", () => {
+    expect(
+      scans.unclickable.ok && scans.unclickable.evidence?.length
+    ).toBeGreaterThan(0);
+  });
+
+  test("never clicks the footer link that opens with an accepting word", () => {
+    // "Aceito os termos de uso" lives in the footer, which is not fixed and
+    // therefore not a banner. Clicking it would record a consent nobody gave.
+    expect(names(scans.unclickable, "post-consent")).toEqual([]);
   });
 });
 
 describe("a store that asks nothing", () => {
   test("is read as a single state, and does not fail", () => {
-    expect(withoutBanner).toMatchObject({ ok: true, consentBanner: false });
+    expect(scans.withoutBanner).toMatchObject({
+      ok: true,
+      consentBanner: "not-found",
+      consentPlatform: null,
+    });
   });
 
   test("has no post-consent state, because nothing was consented to", () => {
-    expect(names(withoutBanner, "post-consent")).toEqual([]);
-    expect(names(withoutBanner, "pre-consent")).toContain("fixture_analytics");
+    expect(names(scans.withoutBanner, "post-consent")).toEqual([]);
+    expect(names(scans.withoutBanner, "pre-consent")).toContain(
+      "fixture_analytics"
+    );
+  });
+
+  test("keeps a screenshot, because this is the strongest claim we make", () => {
+    expect(
+      scans.withoutBanner.ok && scans.withoutBanner.evidence?.length
+    ).toBeGreaterThan(0);
   });
 });

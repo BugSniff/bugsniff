@@ -1,5 +1,5 @@
 /**
- * Putting a name to what a store wrote.
+ * Putting a name to what a store wrote, and to who it talked to.
  *
  * `_fbp` means nothing to the person who owns the shop. "Meta Pixel" means
  * something, and it is the same fact. This is the whole module: the lookup that
@@ -15,9 +15,28 @@
 export type Tracker = {
   /** The name a person recognises. The vendor's, not ours. */
   name: string;
-  /** A regular expression over the cookie's name. */
-  cookie_pattern: string;
+  /** A regular expression over a cookie's name. */
+  cookie_pattern: string | null;
+  /** A regular expression over a third-party host. */
+  host_pattern: string | null;
 };
+
+/**
+ * Matches one value against one pattern.
+ *
+ * A pattern that does not compile is skipped rather than thrown. The list is
+ * data, editable without a deploy, and one bad row should cost one name, not
+ * the whole report.
+ */
+function matches(pattern: string | null, value: string): boolean {
+  if (!pattern) return false;
+
+  try {
+    return new RegExp(pattern, "i").test(value);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The service that wrote this cookie, when we can say which.
@@ -25,41 +44,51 @@ export type Tracker = {
  * `null` is a real answer, and the one that must never turn into a guess: most
  * cookies a shop writes are its own — a session, a cart, a CSRF token — and
  * calling those trackers would be inventing a fact about the shop.
- *
- * A pattern that does not compile is skipped rather than thrown. The list is
- * data, editable without a deploy, and one bad row should cost one name, not
- * the whole report.
  */
-export function nameTracker(
+export function nameCookie(
   cookieName: string,
   trackers: readonly Tracker[]
 ): string | null {
-  for (const { name, cookie_pattern } of trackers) {
-    try {
-      if (new RegExp(cookie_pattern, "i").test(cookieName)) return name;
-    } catch {
-      continue;
-    }
-  }
+  return (
+    trackers.find(({ cookie_pattern }) => matches(cookie_pattern, cookieName))
+      ?.name ?? null
+  );
+}
 
-  return null;
+/** The service behind this host, when we can say which. */
+export function nameHost(
+  host: string,
+  trackers: readonly Tracker[]
+): string | null {
+  return (
+    trackers.find(({ host_pattern }) => matches(host_pattern, host))?.name ??
+    null
+  );
 }
 
 /**
- * The distinct services behind a set of cookies, in the order they first show
- * up.
+ * The distinct services behind a reading, whichever way they showed up.
  *
- * Order matters on the screen: it follows the reading, so a service that fired
- * before anyone was asked appears before one that waited to be allowed.
+ * A service seen as a cookie *and* as a request is one service, not two — the
+ * Meta Pixel that writes `_fbp` and calls `connect.facebook.net` is the same
+ * pixel, and counting it twice would inflate every number the report prints.
  */
 export function namedTrackers(
-  cookies: readonly { name: string }[],
+  reading: {
+    cookies?: readonly { name: string }[];
+    requests?: readonly { host: string }[];
+  },
   trackers: readonly Tracker[]
 ): string[] {
   const names = new Set<string>();
 
-  for (const cookie of cookies) {
-    const name = nameTracker(cookie.name, trackers);
+  for (const cookie of reading.cookies ?? []) {
+    const name = nameCookie(cookie.name, trackers);
+    if (name) names.add(name);
+  }
+
+  for (const request of reading.requests ?? []) {
+    const name = nameHost(request.host, trackers);
     if (name) names.add(name);
   }
 

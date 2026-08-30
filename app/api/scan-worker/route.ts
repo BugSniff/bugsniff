@@ -88,20 +88,24 @@ async function work({ supabase }: Worker, scanId: string) {
   // The pre-consent state, written the moment it exists rather than at the end.
   // The waiting screen listens to this row, so this update is what turns a
   // blank wait into a result that fills in — same scan, same browser, same bill.
-  const scan = await runScan(row.url, async ({ cookies, evidence }) => {
-    await supabase
-      .from("scans")
-      .update({
-        cookies,
-        evidence_pre_path: await storeEvidence(
-          { supabase },
-          scanId,
-          "pre-consent",
-          evidence
-        ),
-      })
-      .eq("id", scanId);
-  });
+  const scan = await runScan(
+    row.url,
+    async ({ cookies, requests, evidence }) => {
+      await supabase
+        .from("scans")
+        .update({
+          cookies,
+          requests,
+          evidence_pre_path: await storeEvidence(
+            { supabase },
+            scanId,
+            "pre-consent",
+            evidence
+          ),
+        })
+        .eq("id", scanId);
+    }
+  );
 
   const finishedAt = new Date().toISOString();
 
@@ -112,6 +116,7 @@ async function work({ supabase }: Worker, scanId: string) {
         ? {
             status: "done",
             cookies: scan.cookies,
+            requests: scan.requests,
             consent_banner: scan.consentBanner,
             consent_platform: scan.consentPlatform,
             evidence_post_path: await storeEvidence(

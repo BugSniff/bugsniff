@@ -7,7 +7,13 @@ import type {
   ConsentPhase,
   ScanRejection,
 } from "@/packages/scan/scan";
-import { nameTracker, namedTrackers, type Tracker } from "@/packages/tracker";
+import { registrableDomain } from "@/packages/scan/third-party";
+import {
+  nameCookie,
+  nameHost,
+  namedTrackers,
+  type Tracker,
+} from "@/packages/tracker";
 import { createClient } from "@/packages/supabase/server";
 import { Watch } from "./watch";
 
@@ -22,6 +28,9 @@ const FAILURES: Record<ScanRejection, string> = {
   blocked:
     "A loja respondeu ao nosso navegador com uma página de erro, não com a loja. Não é um exame limpo: é um exame que não aconteceu.",
 };
+
+/** A third party the store talked to. */
+type Request = { host: string; phase: ConsentPhase };
 
 /** `phase` is absent on scans read before the two states existed. */
 type Cookie = {
@@ -52,7 +61,7 @@ export default async function ScanPage({
   const { data: scan } = await supabase
     .from("scans")
     .select(
-      "id, url, status, cookies, consent_banner, consent_platform, evidence_pre_path, evidence_post_path, failure"
+      "id, url, status, cookies, requests, consent_banner, consent_platform, evidence_pre_path, evidence_post_path, failure"
     )
     .eq("id", id)
     .maybeSingle();
@@ -94,13 +103,14 @@ export default async function ScanPage({
   ]);
 
   const cookies = (scan.cookies ?? []) as Cookie[];
+  const requests = (scan.requests ?? []) as Request[];
 
   // Which service wrote which cookie. Read at render time, not written into the
   // scan, so a name added to the table today names the cookies of a scan taken
   // last week — which is the point of keeping the list as data.
   const { data: trackers } = await supabase
     .from("trackers")
-    .select("name, cookie_pattern");
+    .select("name, cookie_pattern, host_pattern");
 
   // The pre-consent state is written the moment the browser has it, so there
   // is a real reading to show while the second one is still being taken.
@@ -149,8 +159,18 @@ export default async function ScanPage({
             state={scan.consent_banner}
             platform={scan.consent_platform}
           />
+          <BeforeConsent
+            cookies={cookies}
+            requests={requests}
+            trackers={trackers ?? []}
+          />
           <Cookies
             cookies={cookies}
+            consentBanner={scan.consent_banner}
+            trackers={trackers ?? []}
+          />
+          <Requests
+            requests={requests}
             consentBanner={scan.consent_banner}
             trackers={trackers ?? []}
           />
@@ -187,9 +207,6 @@ function Cookies({
   const before = cookies.filter((c) => c.phase !== "post-consent");
   const after = cookies.length - before.length;
 
-  // The line this whole product exists to be able to write.
-  const beforeConsent = namedTrackers(before, trackers);
-
   if (cookies.length === 0) {
     return (
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -207,13 +224,6 @@ function Cookies({
           ? `${before.length} cookies antes do consentimento, ${after} depois de aceitar o banner`
           : `${cookies.length} cookies gravados`}
       </h2>
-
-      {beforeConsent.length > 0 && (
-        <p className="text-sm">
-          Antes de qualquer interação com o banner, esta loja gravou cookies de{" "}
-          <strong className="font-medium">{beforeConsent.join(", ")}</strong>.
-        </p>
-      )}
 
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left text-sm">
@@ -245,7 +255,7 @@ function Cookies({
                   {cookie.name}
                 </td>
                 <td className="border-b border-zinc-100 py-2 pr-4 dark:border-zinc-900">
-                  {nameTracker(cookie.name, trackers) ?? (
+                  {nameCookie(cookie.name, trackers) ?? (
                     <span className="text-zinc-400">não identificado</span>
                   )}
                 </td>
@@ -260,6 +270,134 @@ function Cookies({
                 {twoStates && (
                   <td className="border-b border-zinc-100 py-2 text-zinc-500 dark:border-zinc-900">
                     {PHASES[cookie.phase ?? "pre-consent"]}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The line this whole product exists to be able to write.
+ *
+ * A tracker is a cookie *or* a request to a third party (CONTEXT.md), and both
+ * halves count here: the same service is one service, whichever way it showed
+ * itself. A store that fires a pixel by image writes no cookie at all, and
+ * before requests were observed it came back with nothing to report.
+ */
+function BeforeConsent({
+  cookies,
+  requests,
+  trackers,
+}: {
+  cookies: Cookie[];
+  requests: Request[];
+  trackers: Tracker[];
+}) {
+  const before = {
+    cookies: cookies.filter((c) => c.phase !== "post-consent"),
+    requests: requests.filter((r) => r.phase !== "post-consent"),
+  };
+
+  const named = namedTrackers(before, trackers);
+
+  // The third parties we cannot put a name to, counted by who they are rather
+  // than by how many addresses they answer on. Kept in the sentence on purpose:
+  // the gap is ours, and hiding it would make the reading look more complete
+  // than it is.
+  const unnamed = new Set(
+    before.requests
+      .filter((r) => !nameHost(r.host, trackers))
+      .map((r) => registrableDomain(r.host))
+  );
+
+  const others =
+    unnamed.size > 0
+      ? `${unnamed.size} ${unnamed.size === 1 ? "outro terceiro que não sabemos nomear" : "outros terceiros que não sabemos nomear"}`
+      : null;
+
+  if (named.length === 0 && !others) return null;
+
+  return (
+    <p className="text-sm">
+      Antes de qualquer interação com o banner, esta loja acionou{" "}
+      {named.length > 0 && (
+        <strong className="font-medium">{named.join(", ")}</strong>
+      )}
+      {named.length > 0 && others ? ", e mais " : ""}
+      {others}.
+    </p>
+  );
+}
+
+/**
+ * Who the store talked to, other than itself.
+ *
+ * Everything is listed, named or not. A host we cannot name is not nothing —
+ * it is a third party that saw the visitor arrive, and dropping it because our
+ * table is incomplete would be hiding our own gap in somebody else's report.
+ */
+function Requests({
+  requests,
+  consentBanner,
+  trackers,
+}: {
+  requests: Request[];
+  consentBanner: ConsentBannerState | null;
+  trackers: Tracker[];
+}) {
+  if (requests.length === 0) return null;
+
+  const twoStates = consentBanner === "accepted";
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm text-zinc-600 dark:text-zinc-400">
+        {requests.length} terceiros contactados
+      </h2>
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left text-sm">
+          <thead className="text-zinc-500">
+            <tr>
+              <th className="border-b border-zinc-200 py-2 pr-4 font-normal dark:border-zinc-800">
+                Endereço
+              </th>
+              <th className="border-b border-zinc-200 py-2 pr-4 font-normal dark:border-zinc-800">
+                Rastreador
+              </th>
+              {twoStates && (
+                <th className="border-b border-zinc-200 py-2 font-normal dark:border-zinc-800">
+                  Momento
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {requests.map((request) => (
+              <tr key={`${request.phase}${request.host}`}>
+                <td className="border-b border-zinc-100 py-2 pr-4 font-mono text-xs dark:border-zinc-900">
+                  {request.host}
+                </td>
+                <td className="border-b border-zinc-100 py-2 pr-4 dark:border-zinc-900">
+                  {/* Without a name in the table, the domain is still an
+                      identity: `track.titanpush.com` is titanpush.com, and
+                      saying so beats "não identificado", which throws away
+                      what we already know. Muted, because knowing who received
+                      the data is not the same as knowing which product it is. */}
+                  {nameHost(request.host, trackers) ?? (
+                    <span className="text-zinc-500">
+                      {registrableDomain(request.host)}
+                    </span>
+                  )}
+                </td>
+                {twoStates && (
+                  <td className="border-b border-zinc-100 py-2 text-zinc-500 dark:border-zinc-900">
+                    {PHASES[request.phase]}
                   </td>
                 )}
               </tr>

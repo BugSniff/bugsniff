@@ -19,10 +19,22 @@ const TRACKER_BEFORE = "fixture_analytics";
 /** Fires only on a load that already carries consent. */
 const TRACKER_AFTER = "fixture_pixel";
 
+/**
+ * Third parties the page talks to without writing anything.
+ *
+ * `.example` never resolves, which is the point: the request is made, the
+ * browser reports it, and not one byte reaches anybody. It is also the shape
+ * the scan was blind to until now — a pixel fired by image writes no cookie.
+ */
+const THIRD_PARTY_BEFORE = "pixel-before.example";
+const THIRD_PARTY_AFTER = "pixel-after.example";
+
 const TRACKERS = `<script>
   document.cookie = "${TRACKER_BEFORE}=1; path=/; max-age=3600";
+  new Image().src = "http://${THIRD_PARTY_BEFORE}/px.gif";
   if (document.cookie.includes("fixture_consent=all")) {
     document.cookie = "${TRACKER_AFTER}=1; path=/; max-age=3600";
+    new Image().src = "http://${THIRD_PARTY_AFTER}/px.gif";
   }
   function consent(choice) {
     document.cookie = "fixture_consent=" + choice + "; path=/; max-age=3600";

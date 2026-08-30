@@ -2,7 +2,11 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import type { ConsentPhase, ScanRejection } from "@/packages/scan/scan";
+import type {
+  ConsentBannerState,
+  ConsentPhase,
+  ScanRejection,
+} from "@/packages/scan/scan";
 import { createClient } from "@/packages/supabase/server";
 import { Watch } from "./watch";
 
@@ -29,6 +33,9 @@ const PHASES: Record<ConsentPhase, string> = {
   "post-consent": "depois do consentimento",
 };
 
+/** Long enough to look at the picture, short enough to not be a public link. */
+const EVIDENCE_LINK_SECONDS = 300;
+
 export default async function ScanPage({
   params,
 }: {
@@ -41,7 +48,9 @@ export default async function ScanPage({
   const supabase = await createClient();
   const { data: scan } = await supabase
     .from("scans")
-    .select("id, url, status, cookies, consent_banner, failure")
+    .select(
+      "id, url, status, cookies, consent_banner, consent_platform, evidence_path, failure"
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -64,6 +73,14 @@ export default async function ScanPage({
       })
     );
   }
+
+  // The screenshot is guarded by the same rule as the scan, so asking for a
+  // link to it is asking the same question again — and getting the same answer.
+  const { data: evidence } = scan.evidence_path
+    ? await supabase.storage
+        .from("scan-evidence")
+        .createSignedUrl(scan.evidence_path, EVIDENCE_LINK_SECONDS)
+    : { data: null };
 
   return (
     <main className="mx-auto flex flex-1 w-full max-w-2xl flex-col justify-center gap-6 px-6 py-16">
@@ -91,10 +108,17 @@ export default async function ScanPage({
       )}
 
       {scan.status === "done" && (
-        <Cookies
-          cookies={scan.cookies as Cookie[]}
-          consentBanner={scan.consent_banner}
-        />
+        <>
+          <BannerNote
+            state={scan.consent_banner}
+            platform={scan.consent_platform}
+          />
+          <Cookies
+            cookies={scan.cookies as Cookie[]}
+            consentBanner={scan.consent_banner}
+          />
+          {evidence && <Evidence url={evidence.signedUrl} />}
+        </>
       )}
 
       <p className="text-sm text-zinc-500">
@@ -112,11 +136,11 @@ function Cookies({
 }: {
   cookies: Cookie[];
   /** Null on scans read before the store was read in two states. */
-  consentBanner: boolean | null;
+  consentBanner: ConsentBannerState | null;
 }) {
-  // Two states to compare only where a banner answered. A store that asks
-  // nothing has one reading, because nothing was consented to.
-  const twoStates = consentBanner === true;
+  // Two states to compare only where a banner was actually answered. Anything
+  // else has one reading: either nothing asked, or we could not answer it.
+  const twoStates = consentBanner === "accepted";
   const before = cookies.filter((c) => c.phase !== "post-consent");
   const after = cookies.length - before.length;
 
@@ -137,13 +161,6 @@ function Cookies({
           ? `${before.length} cookies antes do consentimento, ${after} depois de aceitar o banner`
           : `${cookies.length} cookies gravados`}
       </h2>
-
-      {consentBanner === false && (
-        <p className="text-sm text-zinc-500">
-          Esta loja não apresentou banner de consentimento, então foi lida uma
-          vez só.
-        </p>
-      )}
 
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left text-sm">
@@ -190,5 +207,49 @@ function Cookies({
         </table>
       </div>
     </section>
+  );
+}
+
+/**
+ * What the scan can honestly say about the banner.
+ *
+ * The distinction this paragraph exists for: "nosso navegador não encontrou"
+ * is an observation of ours, and the picture below lets anyone check it.
+ * "Esta loja não tem banner" would be an assertion about the store, and that
+ * one does not get made without a human having looked.
+ */
+function BannerNote({
+  state,
+  platform,
+}: {
+  state: ConsentBannerState | null;
+  platform: string | null;
+}) {
+  if (!state || state === "accepted") return null;
+
+  return (
+    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      {state === "unrecognised"
+        ? `${platform ? `Encontramos ${platform} nesta loja` : "Esta loja usa uma plataforma de consentimento"}, mas nosso navegador não conseguiu responder ao banner. As leituras abaixo são de antes de qualquer interação.`
+        : "Nosso navegador não encontrou banner de consentimento nesta loja. Abaixo está o que ele viu."}
+    </p>
+  );
+}
+
+function Evidence({ url }: { url: string }) {
+  return (
+    <figure className="flex flex-col gap-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt="A loja como nosso navegador a viu, antes de qualquer interação"
+        className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800"
+      />
+      <figcaption className="text-xs text-zinc-500">
+        A loja no momento da leitura, antes de qualquer interação. A imagem não
+        mostra cookies: ela mostra a tela em que os cookies acima já estavam
+        gravados.
+      </figcaption>
+    </figure>
   );
 }

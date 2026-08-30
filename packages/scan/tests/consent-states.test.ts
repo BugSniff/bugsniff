@@ -28,6 +28,7 @@ beforeAll(async () => {
     ["inIframe", store.inIframe],
     ["unclickable", store.unclickable],
     ["withoutBanner", store.withoutBanner],
+    ["refusing", store.refusing],
   ] as const;
 
   const results = await Promise.all(
@@ -177,5 +178,20 @@ describe("a store read all the way through", () => {
     const scan = scans.withBanner;
     expect(scan.ok && scan.evidence.preConsent?.length).toBeGreaterThan(0);
     expect(scan.ok && scan.evidence.postConsent?.length).toBeGreaterThan(0);
+  });
+});
+
+describe("a store that refuses our browser", () => {
+  test("is not a reading, and does not pretend to be one", () => {
+    // The refusal page has a title, a body and a cookie of its own. Reported as
+    // a scan, it would be a store with nothing to hide — which is the most
+    // flattering possible way to be wrong about somebody.
+    expect(scans.refusing).toMatchObject({ ok: false, reason: "blocked" });
+  });
+
+  test("keeps the screen that came instead of the store", () => {
+    expect(
+      !scans.refusing.ok && scans.refusing.evidence?.length
+    ).toBeGreaterThan(0);
   });
 });

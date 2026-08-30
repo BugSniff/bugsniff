@@ -73,7 +73,11 @@ export type ObservedCookie = {
   phase: ConsentPhase;
 };
 
-export type ScanRejection = TargetRejection | "unreachable";
+export type ScanRejection =
+  | TargetRejection
+  | "unreachable"
+  /** Something answered, and it was not the store. */
+  | "blocked";
 
 export type Scan =
   | {
@@ -86,7 +90,12 @@ export type Scan =
       evidence: Evidence;
       cookies: ObservedCookie[];
     }
-  | { ok: false; reason: ScanRejection };
+  | {
+      ok: false;
+      reason: ScanRejection;
+      /** The screen that came instead of the store, when there was one. */
+      evidence?: Buffer | null;
+    };
 
 /** How long the store gets to answer before the scan gives up on it. */
 const NAVIGATION_TIMEOUT_MS = 20_000;
@@ -141,17 +150,37 @@ async function openBrowser(): Promise<Browser> {
   });
 }
 
-async function load(page: Page, url: URL) {
+/**
+ * Opens the store, and says whether what answered was the store.
+ *
+ * A shop that refuses our browser still returns a page, with a title and a
+ * body and cookies of its own — and read without looking at the status, that
+ * page is indistinguishable from a store that behaves impeccably. Measured on
+ * the four stores that came back with nothing to report: centauro, netshoes
+ * and casasbahia all answer 403, and havan, which is a real reading, answers
+ * 200 with four thousand elements.
+ *
+ * ponytail: status only. A challenge served with 200 — some Cloudflare
+ * interstitials do that — still reads as a store. The next signal to add is
+ * the challenge's own wording, and the moment to add it is the first time one
+ * shows up in the queue, not before.
+ */
+async function load(page: Page, url: URL): Promise<{ isStore: boolean }> {
   // `domcontentloaded`, not `load`: waiting for every image on a shop's home
   // page buys nothing here. Measured against a real store, both readings
   // returned the same 27 cookies, because trackers fire long before the last
   // image lands. On a slow store `load` would blow the timeout and report a
   // page that rendered fine as unreachable.
-  await page.goto(url.href, {
+  const response = await page.goto(url.href, {
     waitUntil: "domcontentloaded",
     timeout: NAVIGATION_TIMEOUT_MS,
   });
+
+  const status = response?.status() ?? 0;
+  if (status >= 400) return { isStore: false };
+
   await page.waitForTimeout(SETTLE_MS);
+  return { isStore: true };
 }
 
 /**
@@ -218,7 +247,17 @@ export async function observeStore(
     });
     const page = await context.newPage();
 
-    await load(page, url);
+    if (!(await load(page, url)).isStore) {
+      // Not a clean store: a store we did not read. Saying "no cookies were
+      // written" about a page that is not the shop would be the most flattering
+      // possible way to be wrong.
+      return {
+        ok: false,
+        reason: "blocked",
+        evidence: await screenshot(page),
+      };
+    }
+
     const beforeConsent = await context.cookies();
     const beforeScreen = await screenshot(page);
 

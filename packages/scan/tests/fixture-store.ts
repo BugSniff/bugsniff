@@ -124,6 +124,23 @@ const UNCLICKABLE = html(`
 const NO_BANNER = html("");
 
 /**
+ * A shop that refuses our browser.
+ *
+ * Answers 403 with a page of its own — title, body, and a cookie. Read without
+ * looking at the status, it is a store with nothing to report, which is the
+ * most flattering possible way to be wrong about somebody.
+ */
+const REFUSED = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Access Denied</title></head>
+<body>
+<p>You don't have permission to access this server.</p>
+<script>document.cookie = "fixture_edge=1; path=/; max-age=3600";</script>
+</body>
+</html>
+`;
+
+/**
  * A footer link that opens with an accepting word.
  *
  * Not fixed, not a banner. It is here because a scan that hunts for an accept
@@ -140,6 +157,9 @@ const PAGES: Record<string, string> = {
   "/no-banner": NO_BANNER.replace("</body>", `${FOOTER_TRAP}</body>`),
 };
 
+/** The paths that answer with something other than a store. */
+const REFUSING = "/refused";
+
 export type FixtureStore = {
   /** Real buttons, with the refusal listed before the accept. */
   withBanner: URL;
@@ -151,16 +171,21 @@ export type FixtureStore = {
   unclickable: URL;
   /** Asks nothing, and carries the same footer trap. */
   withoutBanner: URL;
+  /** Answers 403 with a page that is not the store. */
+  refusing: URL;
   close: () => Promise<void>;
 };
 
 export async function startFixtureStore(): Promise<FixtureStore> {
   const server = createServer((request, response) => {
-    const page = PAGES[request.url ?? "/"];
-    response.writeHead(page ? 200 : 404, {
+    const path = request.url ?? "/";
+    const page = PAGES[path];
+    const refused = path === REFUSING;
+
+    response.writeHead(refused ? 403 : page ? 200 : 404, {
       "content-type": "text/html; charset=utf-8",
     });
-    response.end(page ?? "<p>não existe</p>");
+    response.end(refused ? REFUSED : (page ?? "<p>not here</p>"));
   });
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -173,6 +198,7 @@ export async function startFixtureStore(): Promise<FixtureStore> {
     inIframe: new URL(`${origin}/iframe`),
     unclickable: new URL(`${origin}/unclickable`),
     withoutBanner: new URL(`${origin}/no-banner`),
+    refusing: new URL(`${origin}${REFUSING}`),
     close: () => {
       // Chromium keeps its connection alive, and `close` waits for every open
       // one — without this the fixture never shuts down and the run hangs.

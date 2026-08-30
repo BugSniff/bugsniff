@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+      }
+      img {
+        max-width: 100%;
+      }
+    </style>
+    <title>Exame por magic link</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+
+    <style>
+      :root {
+        --ground: #f6f9f8;
+        --surface: #ffffff;
+        --plate: #eef3f1;
+        --ink: #14201e;
+        --muted: #5d6e6a;
+        --rule: #dbe4e1;
+        --accent: #0b6b5b;
+        --accent-soft: #d7e8e3;
+        --guard: #8a5d12;
+        --guard-soft: #f4ead6;
+
+        --display: "Newsreader", Georgia, "Times New Roman", serif;
+        --body:
+          "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        --mono:
+          "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --ground: #0d1615;
+          --surface: #141f1d;
+          --plate: #1a2523;
+          --ink: #e3ebe8;
+          --muted: #93a5a0;
+          --rule: #26332f;
+          --accent: #45c1a6;
+          --accent-soft: #1c3a34;
+          --guard: #d9a94e;
+          --guard-soft: #33280f;
+        }
+      }
+
+      :root[data-theme="dark"] {
+        --ground: #0d1615;
+        --surface: #141f1d;
+        --plate: #1a2523;
+        --ink: #e3ebe8;
+        --muted: #93a5a0;
+        --rule: #26332f;
+        --accent: #45c1a6;
+        --accent-soft: #1c3a34;
+        --guard: #d9a94e;
+        --guard-soft: #33280f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 16px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 74ch;
+        margin: 0 auto;
+        padding: clamp(2.5rem, 6vw, 5rem) clamp(1.25rem, 5vw, 2.5rem) 6rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2.75rem;
+      }
+
+      header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      h1 {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: clamp(2rem, 5vw, 2.9rem);
+        line-height: 1.1;
+        letter-spacing: -0.015em;
+        text-wrap: balance;
+        margin: 0;
+      }
+
+      .standfirst {
+        font-family: var(--display);
+        font-size: 1.15rem;
+        font-style: italic;
+        color: var(--muted);
+        max-width: 58ch;
+        margin: 0;
+      }
+
+      h2 {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 1.5rem;
+        letter-spacing: -0.01em;
+        text-wrap: balance;
+        margin: 0 0 0.85rem;
+      }
+
+      section {
+        display: flex;
+        flex-direction: column;
+      }
+      p {
+        margin: 0 0 1rem;
+      }
+      p:last-child {
+        margin-bottom: 0;
+      }
+
+      .plate {
+        background: var(--plate);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 1.5rem 1rem;
+        overflow-x: auto;
+      }
+
+      .plate pre.mermaid {
+        margin: 0;
+        min-width: 640px;
+        display: flex;
+        justify-content: center;
+      }
+
+      .caption {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-top: 0.75rem;
+        line-height: 1.5;
+      }
+
+      .guards {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1.4rem;
+      }
+
+      .guards li {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0 1rem;
+        align-items: baseline;
+      }
+
+      .guards .n {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: var(--guard);
+        background: var(--guard-soft);
+        border-radius: 2px;
+        padding: 0.15rem 0.45rem;
+        letter-spacing: 0.06em;
+      }
+
+      .guards h3 {
+        font-family: var(--body);
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .guards p {
+        grid-column: 2;
+        margin: 0.3rem 0 0;
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      .note {
+        border-left: 2px solid var(--accent);
+        background: var(--accent-soft);
+        padding: 1rem 1.15rem;
+        border-radius: 0 3px 3px 0;
+        font-size: 0.94rem;
+      }
+
+      .note strong {
+        font-weight: 600;
+      }
+
+      dl {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1.1rem;
+      }
+      dt {
+        font-weight: 600;
+        font-size: 0.98rem;
+      }
+      dd {
+        margin: 0.2rem 0 0;
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 0.86em;
+        background: var(--accent-soft);
+        color: var(--ink);
+        padding: 0.1em 0.35em;
+        border-radius: 2px;
+      }
+
+      hr {
+        border: 0;
+        border-top: 1px solid var(--rule);
+        margin: 0;
+      }
+
+      footer {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 2px;
+      }
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <span class="eyebrow">bugsniff · desenho de fluxo</span>
+        <h1>Exame por magic link</h1>
+        <p class="standfirst">
+          Como uma pessoa sai de uma URL colada num campo até um exame
+          executado, com o gasto de navegador atrás de prova de posse do e-mail.
+        </p>
+      </header>
+
+      <section>
+        <div class="plate">
+          <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#dfece8','primaryTextColor':'#14201e','primaryBorderColor':'#0b6b5b','lineColor':'#5d6e6a','secondaryColor':'#f4ead6','tertiaryColor':'#ffffff','fontFamily':'IBM Plex Sans, sans-serif','fontSize':'13px','actorBkg':'#dfece8','actorBorder':'#0b6b5b','actorTextColor':'#14201e','signalColor':'#5d6e6a','signalTextColor':'#14201e','labelBoxBkgColor':'#f4ead6','labelBoxBorderColor':'#8a5d12','labelTextColor':'#14201e','noteBkgColor':'#f4ead6','noteBorderColor':'#8a5d12','noteTextColor':'#14201e','sequenceNumberColor':'#ffffff'}}}%%
+sequenceDiagram
+    autonumber
+    actor P as Pessoa
+    participant B as bugsniff
+    participant S as Supabase
+    participant R as Resend
+    participant F as Fila
+    participant L as Loja
+
+    P->>B: URL + e-mail, "Examinar"
+    Note over P,B: Guarda 1 — Firewall da Vercel<br/>10 pedidos por hora por IP
+    B->>S: signInWithOtp(e-mail)
+    Note right of S: cria o usuário se não existir<br/>trigger cria organização,<br/>pessoa nasce proprietária
+    S->>R: pede o envio
+    R-->>P: e-mail com o magic link
+
+    Note over P,F: Guarda 2 — até aqui nada caro rodou.<br/>Nenhum navegador sobe sem prova de posse do e-mail.
+
+    P->>B: clica no link
+    B->>S: troca o código por sessão
+    S-->>B: sessão e organização
+    B->>F: enfileira o exame
+    B-->>P: tela de espera
+
+    Note over F: Guarda 3 — N workers<br/>o teto de gasto é o número de workers,<br/>nunca o tamanho da fila
+
+    F->>L: abre a loja no Chromium
+    L-->>F: cookies gravados
+    F->>S: grava o exame com a organização
+    S-->>P: Realtime empurra o resultado
+</pre>
+        </div>
+        <p class="caption">
+          Um e-mail só, e ele carrega apenas o magic link — quando é enviado, o
+          exame ainda não rodou. O resultado aparece na tela, não na caixa de
+          entrada.
+        </p>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>As três guardas</h2>
+        <p>
+          Cada uma protege uma coisa diferente. A numeração é a ordem em que a
+          requisição as encontra, não prioridade.
+        </p>
+        <ol class="guards">
+          <li>
+            <span class="n">01</span>
+            <h3>Firewall, 10 pedidos por hora por IP</h3>
+            <p>
+              Na borda da Vercel, antes da nossa função existir — o pedido
+              abusivo não chega a custar nada. Fica no IP real de quem pede, e
+              não no do nosso servidor, que é o que o limitador do Supabase
+              enxergaria. Não são 2 por IP: operadora móvel com CGNAT,
+              escritório de agência e coworking compartilham um IP, e o cliente
+              do painel de agência seria o primeiro bloqueado.
+            </p>
+          </li>
+          <li>
+            <span class="n">02</span>
+            <h3>Magic link, prova de posse do e-mail</h3>
+            <p>
+              O exame não roda no envio do formulário. Roda quando a pessoa
+              clica no link que chegou na caixa dela. Custa uma espera a mais no
+              caminho, e em troca nenhum Chromium sobe por e-mail inventado.
+            </p>
+          </li>
+          <li>
+            <span class="n">03</span>
+            <h3>Fila com N workers</h3>
+            <p>
+              É a única garantia de teto de gasto. Com cinco workers, o custo
+              máximo por hora é o mesmo com dez ou dez mil na fila — quem enche
+              a fila aumenta a própria espera, não a nossa conta.
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>O que o desenho assume</h2>
+        <dl>
+          <dt>Não existe senha</dt>
+          <dd>
+            O magic link é a porta única, para quem já tem conta e para quem não
+            tem. Some o fluxo de recuperação de senha, que nunca chegou a ser
+            construído. Some também a rede: e-mail fora do ar é ninguém
+            entrando, e sessão longa é o que reduz essa dependência a um link
+            por dispositivo novo.
+          </dd>
+
+          <dt>Todo e-mail digitado vira usuário e organização</dt>
+          <dd>
+            <code>signInWithOtp</code> cria a conta no momento do pedido, não no
+            do clique, e o trigger de organização dispara junto. Mil e-mails
+            digitados são mil organizações. A limpeza resolve isso melhor que a
+            prevenção: apagar usuário não confirmado depois de alguns dias, e o
+            cascade do ADR-0004 leva a organização junto.
+          </dd>
+
+          <dt>O exame nasce sem dono</dt>
+          <dd>
+            Quando ele roda, a pessoa já provou posse do e-mail, então o exame
+            já pode nascer com organização. O <code>claim_token</code> continua
+            existindo para o caso do exame que roda antes de haver sessão — e é
+            por isso que ele é separado do <code>id</code>.
+          </dd>
+
+          <dt>A tela de espera não precisa de polling</dt>
+          <dd>
+            O Realtime do Supabase empurra a mudança da linha de
+            <code>scans</code> quando o worker termina, e a RLS já garante que a
+            pessoa só escuta o exame da própria organização.
+          </dd>
+        </dl>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>Tetos conhecidos</h2>
+        <div class="note">
+          <p>
+            <strong>Resend, plano gratuito: 100 e-mails por dia.</strong> Sem
+            senha, isso é o número de acessos a dispositivos novos por dia no
+            produto inteiro. O limitador do Supabase já foi elevado a 300 por
+            hora, então o gargalo agora é o Resend.
+          </p>
+          <p style="margin-bottom: 0">
+            Não é problema hoje — não há usuário. Vira problema no dia em que
+            houver, e a solução é o plano pago, não arquitetura.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        Decisões relacionadas: ADR-0002 (Chromium na Vercel) · ADR-0004 (a
+        organização morre com seu proprietário)<br />
+        Issues: #19 fila e monitoramento · #11 revelação parcial · #22 planos e
+        cobrança
+      </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+      mermaid.initialize({ startOnLoad: true, securityLevel: "strict" });
+    </script>
+  </body>
+</html>

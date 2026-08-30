@@ -1,5 +1,7 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import type { ScanRejection } from "@/packages/scan/scan";
 import { createClient } from "@/packages/supabase/server";
 import { Watch } from "./watch";
@@ -35,6 +37,22 @@ export default async function ScanPage({
   if (!scan) notFound();
 
   const waiting = scan.status === "pending" || scan.status === "running";
+
+  // Whoever is waiting is the sweeper.
+  //
+  // The chain normally hands each scan to the next, but a function that dies
+  // mid-scan breaks it and leaves the queue standing still. Rather than a cron
+  // sweeping for orphans on a schedule, the person looking at a scan that has
+  // not started nudges the queue themselves — which is exactly when it matters
+  // and never when it does not. A scan nobody is waiting for can wait.
+  if (scan.status === "pending") {
+    const origin = (await headers()).get("origin");
+    after(() =>
+      fetch(`${origin}/api/scan-worker`, { method: "POST" }).catch(() => {
+        // Another visit will try again.
+      })
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-6 px-6 py-16">

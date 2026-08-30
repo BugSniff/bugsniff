@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { observeStore, type ObservedCookie, type Scan } from "../scan";
+import {
+  observeStore,
+  type ObservedCookie,
+  type PreConsentReading,
+  type Scan,
+} from "../scan";
 import { startFixtureStore, type FixtureStore } from "./fixture-store";
 
 /**
@@ -12,6 +17,9 @@ import { startFixtureStore, type FixtureStore } from "./fixture-store";
 let store: FixtureStore;
 const scans: Record<string, Scan> = {};
 
+/** What the scan handed over before it went looking for the banner. */
+const handedOver: PreConsentReading[] = [];
+
 beforeAll(async () => {
   store = await startFixtureStore();
   const shapes = [
@@ -22,7 +30,18 @@ beforeAll(async () => {
     ["withoutBanner", store.withoutBanner],
   ] as const;
 
-  const results = await Promise.all(shapes.map(([, url]) => observeStore(url)));
+  const results = await Promise.all(
+    shapes.map(([name, url]) =>
+      observeStore(
+        url,
+        name === "withBanner"
+          ? async (reading) => {
+              handedOver.push(reading);
+            }
+          : undefined
+      )
+    )
+  );
   shapes.forEach(([name], index) => (scans[name] = results[index]));
 }, 120_000);
 
@@ -95,7 +114,7 @@ describe("a banner the scan cannot answer", () => {
 
   test("keeps a screenshot, because only a picture confirms this", () => {
     expect(
-      scans.unclickable.ok && scans.unclickable.evidence?.length
+      scans.unclickable.ok && scans.unclickable.evidence.preConsent?.length
     ).toBeGreaterThan(0);
   });
 
@@ -124,7 +143,39 @@ describe("a store that asks nothing", () => {
 
   test("keeps a screenshot, because this is the strongest claim we make", () => {
     expect(
-      scans.withoutBanner.ok && scans.withoutBanner.evidence?.length
+      scans.withoutBanner.ok && scans.withoutBanner.evidence.preConsent?.length
     ).toBeGreaterThan(0);
+  });
+});
+
+describe("the first half of the reading", () => {
+  test("is handed over before the banner is answered", () => {
+    // Not a detail of implementation: this hand-over is what puts a real
+    // result on the screen at five seconds instead of at twenty-five.
+    expect(handedOver).toHaveLength(1);
+    expect(handedOver[0].cookies.map((c) => c.name)).toContain(
+      "fixture_analytics"
+    );
+  });
+
+  test("carries only what was true before any interaction", () => {
+    expect(handedOver[0].cookies.every((c) => c.phase === "pre-consent")).toBe(
+      true
+    );
+    expect(handedOver[0].cookies.map((c) => c.name)).not.toContain(
+      "fixture_pixel"
+    );
+  });
+
+  test("comes with the store's screen as it stood then", () => {
+    expect(handedOver[0].evidence?.length).toBeGreaterThan(0);
+  });
+});
+
+describe("a store read all the way through", () => {
+  test("keeps a screen from each reading", () => {
+    const scan = scans.withBanner;
+    expect(scan.ok && scan.evidence.preConsent?.length).toBeGreaterThan(0);
+    expect(scan.ok && scan.evidence.postConsent?.length).toBeGreaterThan(0);
   });
 });

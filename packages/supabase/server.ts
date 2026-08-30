@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { withVerifierExpiry } from "./lib/cookies";
 import { supabaseAnonKey, supabaseUrl } from "./lib/env";
 
 /**
@@ -17,7 +18,7 @@ export async function createClient() {
       setAll: (cookiesToSet) => {
         try {
           for (const { name, value, options } of cookiesToSet) {
-            store.set(name, value, options);
+            store.set(name, value, withVerifierExpiry(name, options));
           }
         } catch {
           // Server Components cannot write cookies. Harmless: the proxy runs

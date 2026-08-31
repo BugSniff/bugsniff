@@ -1,6 +1,5 @@
 import { IconAlertCircle } from "@tabler/icons-react";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Mark } from "@/components/brand";
 import { LinkSent } from "@/components/link-sent";
@@ -9,12 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/packages/supabase/server";
-import {
-  refusalHeading,
-  sendFailure,
-  sendMessage,
-  showAddress,
-} from "@/lib/copy";
+import { refusalHeading, sendFailure, sendMessage } from "@/lib/copy";
 import { SubmitButton } from "@/components/submit-button";
 
 /**

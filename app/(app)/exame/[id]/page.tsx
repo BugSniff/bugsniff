@@ -17,7 +17,12 @@ import {
   type Tracker,
 } from "@/packages/tracker";
 import { createClient } from "@/packages/supabase/server";
+import { IconFileText } from "@tabler/icons-react";
 import { AppShell } from "@/components/app-shell";
+import { ScoreCard } from "@/components/score-card";
+import { Card } from "@/components/ui/card";
+import { scoreOf } from "@/lib/score";
+import { buttonVariants } from "@/components/ui/button";
 import { canonicalHost } from "@/lib/store";
 import { Watch } from "./watch";
 
@@ -65,7 +70,7 @@ export default async function ScanPage({
   const { data: scan } = await supabase
     .from("scans")
     .select(
-      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, evidence_pre_path, evidence_post_path, failure, findings"
+      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, policy_text, evidence_pre_path, evidence_post_path, failure, findings"
     )
     .eq("id", id)
     .maybeSingle();
@@ -123,6 +128,16 @@ export default async function ScanPage({
   return (
     <AppShell
       active="/painel"
+      actions={
+        scan.status === "done" ? (
+          <Link
+            href={`/exame/${scan.id}/relatorio`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <IconFileText size={14} stroke={2} /> Relatório
+          </Link>
+        ) : null
+      }
       crumbs={
         <>
           <Link href="/painel" className="hover:text-foreground">
@@ -179,6 +194,13 @@ export default async function ScanPage({
               state={scan.consent_banner}
               platform={scan.consent_platform}
             />
+            {scan.status === "done" && (
+              <Card className="px-6">
+                <ScoreCard
+                  score={scoreOf(scan, (trackers ?? []) as Tracker[])}
+                />
+              </Card>
+            )}
             <Findings findings={(scan.findings ?? []) as Finding[]} />
             <BeforeConsent
               cookies={cookies}

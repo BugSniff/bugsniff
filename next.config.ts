@@ -1,14 +1,23 @@
 import type { NextConfig } from "next";
 
 /**
- * The route that launches a browser, and therefore needs its binaries shipped.
+ * The routes that launch a browser, and therefore need its binaries shipped.
  *
- * This key follows the scan. It used to be `/`, back when pasting a URL ran the
- * browser during the page render; the worker owns that now. Point it at a route
- * that no longer opens Chromium and the build still passes — the failure only
- * shows up in production, as "cannot find module".
+ * These keys follow the code. The first used to be `/`, back when pasting a URL
+ * ran the browser during the page render; the worker owns that now. Point one
+ * at a route that no longer opens Chromium — or add a route that does and
+ * forget to list it here — and the build still passes. The failure only shows
+ * up in production, as "cannot find module".
+ *
+ * Every caller of `packages/scan/browser.ts` belongs in this list.
  */
-const SCAN_ROUTE = "/api/scan-worker";
+const BROWSER_ROUTES = ["/api/scan-worker", "/api/exame/[id]/relatorio"];
+
+const CHROMIUM = [
+  "./node_modules/@sparticuz/chromium/bin/**",
+  "./node_modules/playwright-core/browsers.json",
+  "./node_modules/playwright-core/lib/**",
+];
 
 const nextConfig: NextConfig = {
   // Both packages find their binaries by walking relative paths at runtime.
@@ -24,13 +33,9 @@ const nextConfig: NextConfig = {
   //
   // Vercel's `includeFiles` documentation does not apply to Next projects.
   // These have to be forced here, keyed by the route that needs them.
-  outputFileTracingIncludes: {
-    [SCAN_ROUTE]: [
-      "./node_modules/@sparticuz/chromium/bin/**",
-      "./node_modules/playwright-core/browsers.json",
-      "./node_modules/playwright-core/lib/**",
-    ],
-  },
+  outputFileTracingIncludes: Object.fromEntries(
+    BROWSER_ROUTES.map((route) => [route, CHROMIUM])
+  ),
 };
 
 export default nextConfig;

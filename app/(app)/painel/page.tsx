@@ -1,15 +1,11 @@
 import { IconAlertCircle, IconScan } from "@tabler/icons-react";
 import Link from "next/link";
-import { requestScan } from "@/app/scan-action";
 import { AppShell } from "@/components/app-shell";
-import { storeName } from "@/lib/store";
 import { Mark } from "@/components/brand";
-import { SubmitButton } from "@/components/submit-button";
+import { NewScan } from "@/components/new-scan";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -18,22 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { scanRefusal } from "@/lib/copy";
+import {
+  summarise,
+  trackersIn,
+  type Exam,
+  type StoreSummary,
+} from "@/lib/exams";
 import { timeAgo } from "@/lib/time";
-import type { ConsentBannerState, ConsentPhase } from "@/packages/scan/scan";
-import { namedTrackers, type Tracker } from "@/packages/tracker";
+import type { ConsentBannerState } from "@/packages/scan/scan";
 import { createClient } from "@/packages/supabase/server";
-
-/** What the person lands on after the link in their inbox. */
-type Row = {
-  id: string;
-  url: string;
-  status: string;
-  consent_banner: ConsentBannerState | null;
-  cookies: { name: string; phase?: ConsentPhase }[] | null;
-  requests: { host: string; phase?: ConsentPhase }[] | null;
-  created_at: string;
-};
+import type { Tracker } from "@/packages/tracker";
 
 /** How the banner reads in a table, in the words the scan may honestly use. */
 const BANNER: Record<ConsentBannerState, string> = {
@@ -42,10 +32,16 @@ const BANNER: Record<ConsentBannerState, string> = {
   unrecognised: "não reconhecido",
 };
 
-const inPhase = (row: Row, phase: ConsentPhase) => ({
-  cookies: (row.cookies ?? []).filter((c) => c.phase === phase),
-  requests: (row.requests ?? []).filter((r) => r.phase === phase),
-});
+/**
+ * How many readings to fetch to work out where each store stands.
+ *
+ * ponytail: every reading of the organization, grouped in memory, because at
+ * a few dozen scans that is one query instead of one per store. The moment an
+ * agency with forty shops has a year of weekly readings this is two thousand
+ * rows to summarise five, and the answer is a view that returns the latest per
+ * store — not a bigger limit.
+ */
+const READINGS = 500;
 
 export default async function PainelPage({
   searchParams,
@@ -54,36 +50,37 @@ export default async function PainelPage({
 }) {
   const { erro } = await searchParams;
 
-  // RLS scopes both of these to the caller's own organizations, so there is
+  // RLS scopes all of these to the caller's own organizations, so there is
   // nothing to filter by here and nothing to leak by asking.
   const supabase = await createClient();
-  const [{ data: scans }, { data: trackers }, { data: organization }] =
+  const [{ data: stores }, { data: exams }, { data: trackers }, { data: org }] =
     await Promise.all([
+      supabase.from("stores").select("id, host"),
       supabase
         .from("scans")
         .select(
-          "id, url, status, consent_banner, cookies, requests, created_at"
+          "id, url, status, consent_banner, policy_state, cookies, requests, created_at, store_id"
         )
         .order("created_at", { ascending: false })
-        .limit(50),
+        .limit(READINGS),
       supabase.from("trackers").select("name, cookie_pattern, host_pattern"),
       supabase.from("organizations").select("name").maybeSingle(),
     ]);
 
-  const rows = (scans ?? []) as Row[];
+  const summary = summarise(stores ?? [], (exams ?? []) as Exam[]);
 
   return (
     <AppShell
       active="/painel"
       crumbs={<strong className="font-medium text-foreground">Painel</strong>}
     >
-      {rows.length === 0 ? (
+      {summary.length === 0 ? (
         <FirstStore erro={erro} />
       ) : (
-        <Exams
-          rows={rows}
+        <Stores
+          stores={summary}
           trackers={(trackers ?? []) as Tracker[]}
-          organization={organization?.name ?? "Painel"}
+          organization={org?.name ?? "Painel"}
           erro={erro}
         />
       )}
@@ -124,19 +121,7 @@ function FirstStore({ erro }: { erro?: string }) {
           </p>
         </div>
 
-        <form action={requestScan} className="flex w-[440px] flex-col gap-2">
-          <input type="hidden" name="voltar" value="/painel" />
-          <div className="flex gap-2">
-            <Label htmlFor="url" className="sr-only">
-              Endereço da loja
-            </Label>
-            <Input id="url" name="url" required placeholder="loja.com.br" />
-            <SubmitButton working="Começando…" className={buttonVariants()}>
-              Examinar
-            </SubmitButton>
-          </div>
-          {erro && <Refusal code={erro} />}
-        </form>
+        <NewScan erro={erro} label="Examinar" className="w-[440px]" />
       </Card>
 
       <div className="flex flex-col gap-5 md:flex-row">
@@ -166,14 +151,20 @@ const NEXT = [
   },
 ] as const;
 
-/** Everything this organization has examined, most recent first. */
-function Exams({
-  rows,
+/**
+ * The stores this organization audits, newest reading first.
+ *
+ * Stores, not readings. A store examined five times is one shop with a
+ * history, and a list that repeats it five times cannot say a single true
+ * sentence about how it changed.
+ */
+function Stores({
+  stores,
   trackers,
   organization,
   erro,
 }: {
-  rows: Row[];
+  stores: StoreSummary[];
   trackers: Tracker[];
   /** The organization's own name, which is what the page is about. */
   organization: string;
@@ -187,38 +178,16 @@ function Exams({
             {organization}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {rows.length === 1 ? "1 exame" : `${rows.length} exames`}
+            {stores.length === 1 ? "1 loja" : `${stores.length} lojas`}
           </p>
         </div>
 
-        <form action={requestScan} className="flex items-start gap-2">
-          <input type="hidden" name="voltar" value="/painel" />
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              <Label htmlFor="url" className="sr-only">
-                Endereço da loja
-              </Label>
-              <Input
-                id="url"
-                name="url"
-                required
-                placeholder="loja.com.br"
-                className="w-56"
-              />
-              <SubmitButton working="Começando…" className={buttonVariants()}>
-                Novo exame
-              </SubmitButton>
-            </div>
-            {erro && <Refusal code={erro} />}
-          </div>
-        </form>
+        <NewScan erro={erro} label="Novo exame" />
       </div>
 
       <Card className="gap-0 p-0">
         <div className="flex flex-col gap-1 px-6 py-5">
-          <span className="font-heading text-base font-medium">
-            Exames recentes
-          </span>
+          <span className="font-heading text-base font-medium">Lojas</span>
           <span className="text-xs text-muted-foreground">
             O que cada loja acionou antes de perguntar qualquer coisa
           </span>
@@ -229,16 +198,16 @@ function Exams({
             <TableHeader>
               <TableRow>
                 <TableHead>Loja</TableHead>
+                <TableHead>Exames</TableHead>
                 <TableHead>Banner</TableHead>
                 <TableHead>Antes do consentimento</TableHead>
-                <TableHead>Depois</TableHead>
-                <TableHead>Quando</TableHead>
+                <TableHead>Último exame</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
-                <ExamRow key={row.id} row={row} trackers={trackers} />
+              {stores.map((store) => (
+                <StoreRow key={store.id} store={store} trackers={trackers} />
               ))}
             </TableBody>
           </Table>
@@ -249,30 +218,39 @@ function Exams({
 }
 
 /**
- * One scan, in five columns.
+ * One store, as its most recent reading leaves it.
  *
- * A scan that failed is not a store with nothing to report. It gets its own
- * mark and no counts at all, because "nenhum rastreador" about a page that was
- * never the store is the most flattering possible way to be wrong (#34).
+ * A reading that did not happen gets its own mark and no counts at all,
+ * because "nenhum rastreador" about a page that was never the store is the
+ * most flattering possible way to be wrong (#34).
  */
-function ExamRow({ row, trackers }: { row: Row; trackers: Tracker[] }) {
-  const done = row.status === "done";
-  const failed = row.status === "failed";
-
-  const before = done
-    ? namedTrackers(inPhase(row, "pre-consent"), trackers)
-    : [];
-  const after = done
-    ? namedTrackers(inPhase(row, "post-consent"), trackers)
-    : [];
+function StoreRow({
+  store,
+  trackers,
+}: {
+  store: StoreSummary;
+  trackers: Tracker[];
+}) {
+  const { latest } = store;
+  const done = latest.status === "done";
+  const failed = latest.status === "failed";
+  const before = trackersIn(latest, "pre-consent", trackers);
 
   return (
     <TableRow>
-      <TableCell className="font-mono text-xs">{storeName(row.url)}</TableCell>
+      <TableCell className="font-mono text-xs">{store.host}</TableCell>
+
+      <TableCell className="text-muted-foreground tabular-nums">
+        {store.exams}
+      </TableCell>
 
       <TableCell>
-        {done && row.consent_banner ? (
-          <Badge variant="outline">{BANNER[row.consent_banner]}</Badge>
+        {done && latest.consent_banner ? (
+          <Badge variant="outline">{BANNER[latest.consent_banner]}</Badge>
+        ) : failed ? (
+          <Badge variant="destructive">
+            <IconAlertCircle size={12} stroke={2} /> não medido
+          </Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
         )}
@@ -292,36 +270,18 @@ function ExamRow({ row, trackers }: { row: Row; trackers: Tracker[] }) {
         )}
       </TableCell>
 
-      <TableCell className="text-muted-foreground tabular-nums">
-        {done ? after.length : "—"}
-      </TableCell>
-
       <TableCell className="text-xs text-muted-foreground">
-        {timeAgo(row.created_at)}
+        {timeAgo(latest.created_at)}
       </TableCell>
 
       <TableCell className="text-right">
-        {failed ? (
-          <Badge variant="destructive">
-            <IconAlertCircle size={12} stroke={2} /> não medido
-          </Badge>
-        ) : (
-          <Link
-            href={`/exame/${row.id}`}
-            className={buttonVariants({ variant: "ghost", size: "xs" })}
-          >
-            {done ? "Abrir" : "Acompanhar"}
-          </Link>
-        )}
+        <Link
+          href={`/loja/${store.id}`}
+          className={buttonVariants({ variant: "ghost", size: "xs" })}
+        >
+          Abrir
+        </Link>
       </TableCell>
     </TableRow>
-  );
-}
-
-function Refusal({ code }: { code: string }) {
-  return (
-    <p role="alert" className="text-sm text-destructive">
-      {scanRefusal(code)}
-    </p>
   );
 }

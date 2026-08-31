@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { after, type NextRequest } from "next/server";
+import { storeFor } from "@/app/scan-action";
 import { createAdminClient } from "@/packages/supabase/admin";
 import { createClient } from "@/packages/supabase/server";
 
@@ -55,13 +56,30 @@ export async function GET(request: NextRequest) {
 
   if (!organization) redirect("/painel");
 
+  // The store is born here, not at the form: a store belongs to an
+  // organization, and until this click there was no organization to belong to.
+  // The parked scan knows only the address it was asked about.
+  const admin = createAdminClient();
+  const { data: parked } = await admin
+    .from("scans")
+    .select("url")
+    .eq("claim_token", claimToken)
+    .eq("status", "awaiting_confirmation")
+    .maybeSingle();
+
+  if (!parked) redirect("/painel");
+
+  const storeId = await storeFor(organization.id, new URL(parked.url));
+  if (!storeId) redirect("/painel");
+
   // Adopting needs the service role: `scans` has no update policy, by design.
   // The `awaiting_confirmation` condition is what makes a claim token single
-  // use — a second click finds nothing to adopt and simply lands on the scan.
-  const { data: scan } = await createAdminClient()
+  // use — a second click finds nothing to adopt and simply lands on the panel.
+  const { data: scan } = await admin
     .from("scans")
     .update({
       organization_id: organization.id,
+      store_id: storeId,
       status: "pending",
       pending_at: new Date().toISOString(),
     })

@@ -18,7 +18,7 @@ import {
 } from "@/packages/tracker";
 import { createClient } from "@/packages/supabase/server";
 import { AppShell } from "@/components/app-shell";
-import { storeName } from "@/lib/store";
+import { canonicalHost } from "@/lib/store";
 import { Watch } from "./watch";
 
 /** Why a scan came back empty-handed, in words the person can act on. */
@@ -130,7 +130,7 @@ export default async function ScanPage({
           </Link>
           <span>/</span>
           <strong className="font-medium text-foreground">
-            {storeName(scan.url)}
+            {canonicalHost(scan.url)}
           </strong>
         </>
       }
@@ -140,7 +140,7 @@ export default async function ScanPage({
       <div className="flex w-full max-w-2xl flex-col gap-6">
         <div>
           <h1 className="font-mono text-xl font-semibold">
-            {storeName(scan.url)}
+            {canonicalHost(scan.url)}
           </h1>
           <p className="mt-1 text-sm text-zinc-500">{scan.url}</p>
         </div>

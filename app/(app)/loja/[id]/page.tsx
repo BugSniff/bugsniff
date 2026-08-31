@@ -196,12 +196,22 @@ function ExamRow({ exam, trackers }: { exam: Exam; trackers: Tracker[] }) {
             <IconAlertCircle size={12} stroke={2} /> não medido
           </Badge>
         ) : (
-          <Link
-            href={`/exame/${exam.id}`}
-            className={buttonVariants({ variant: "ghost", size: "xs" })}
-          >
-            {done ? "Abrir" : "Acompanhar"}
-          </Link>
+          <div className="flex justify-end gap-1">
+            {done && (
+              <Link
+                href={`/exame/${exam.id}/relatorio`}
+                className={buttonVariants({ variant: "ghost", size: "xs" })}
+              >
+                Relatório
+              </Link>
+            )}
+            <Link
+              href={`/exame/${exam.id}`}
+              className={buttonVariants({ variant: "ghost", size: "xs" })}
+            >
+              {done ? "Abrir" : "Acompanhar"}
+            </Link>
+          </div>
         )}
       </TableCell>
     </TableRow>

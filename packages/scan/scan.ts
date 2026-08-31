@@ -1,9 +1,5 @@
-import chromium from "@sparticuz/chromium";
-import {
-  chromium as playwright,
-  type Browser,
-  type Page,
-} from "playwright-core";
+import { type Browser, type Page } from "playwright-core";
+import { openBrowser } from "./browser";
 import {
   acceptConsentBanner,
   detectConsentPlatform,
@@ -144,31 +140,6 @@ const BANNER_BUDGET_MS = 5_000;
  * slow than absent.
  */
 const BANNER_BUDGET_WITH_PLATFORM_MS = 20_000;
-
-/**
- * Opens a browser wherever this happens to be running.
- *
- * On Vercel the binary comes from `@sparticuz/chromium`, unpacked from the
- * brotli archives that `next.config.ts` has to force into the deployment. That
- * binary is built for Linux, so a laptop uses the browser it already has —
- * point `CHROME_PATH` at one if the default is wrong.
- */
-async function openBrowser(): Promise<Browser> {
-  if (process.env.VERCEL) {
-    return playwright.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: true,
-    });
-  }
-
-  return playwright.launch({
-    executablePath:
-      process.env.CHROME_PATH ??
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    headless: true,
-  });
-}
 
 /**
  * Opens the store, and says whether what answered was the store.

@@ -17,7 +17,9 @@ import {
   type Tracker,
 } from "@/packages/tracker";
 import { createClient } from "@/packages/supabase/server";
+import { IconFileText } from "@tabler/icons-react";
 import { AppShell } from "@/components/app-shell";
+import { buttonVariants } from "@/components/ui/button";
 import { canonicalHost } from "@/lib/store";
 import { Watch } from "./watch";
 
@@ -123,6 +125,16 @@ export default async function ScanPage({
   return (
     <AppShell
       active="/painel"
+      actions={
+        scan.status === "done" ? (
+          <Link
+            href={`/exame/${scan.id}/relatorio`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <IconFileText size={14} stroke={2} /> Relatório
+          </Link>
+        ) : null
+      }
       crumbs={
         <>
           <Link href="/painel" className="hover:text-foreground">

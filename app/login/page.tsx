@@ -1,15 +1,20 @@
-import { IconAlertCircle, IconMail } from "@tabler/icons-react";
+import { IconAlertCircle } from "@tabler/icons-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Mark } from "@/components/brand";
+import { LinkSent } from "@/components/link-sent";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/packages/supabase/server";
-import { refusalHeading, sendFailure, sendMessage, showAddress } from "./copy";
+import {
+  refusalHeading,
+  sendFailure,
+  sendMessage,
+  showAddress,
+} from "@/lib/copy";
 import { SubmitButton } from "../submit-button";
 
 /**
@@ -68,7 +73,19 @@ export default async function LoginPage({
 
   // Three screens, not three notices inside one form. Each is a different
   // moment: asking, having asked, and finding that the link no longer works.
-  if (enviado !== undefined) return <LinkSent to={enviado} />;
+  if (enviado !== undefined) {
+    return (
+      <Centered>
+        <LinkSent
+          to={enviado}
+          back={{ href: "/login", label: "Pedir outro link" }}
+        >
+          Abra seu e-mail e clique no link para entrar. Ele vale por pouco tempo
+          e só funciona uma vez.
+        </LinkSent>
+      </Centered>
+    );
+  }
   if (expirado !== undefined) return <LinkExpired refusal={expirado} />;
 
   return (
@@ -113,50 +130,6 @@ export default async function LoginPage({
           Quem ainda não tem conta entra pelo mesmo campo: o primeiro link cria
           a organização.
         </p>
-      </Card>
-    </Centered>
-  );
-}
-
-/**
- * The person is about to leave for somewhere that is not ours.
- *
- * Which is the whole reason this is a screen of its own and not a line above
- * the form: the next thing they do happens in their inbox, and a notice
- * stacked on top of a form they already submitted invites them to submit it
- * again — two links in the inbox, and no way to tell which one is theirs.
- */
-function LinkSent({ to }: { to: string }) {
-  return (
-    <Centered>
-      <Card className="w-[460px] items-start gap-4 px-6">
-        <Mark size="lg">
-          <IconMail size={20} stroke={2} />
-        </Mark>
-
-        <div className="flex flex-col gap-2">
-          <h1 className="text-xl font-semibold">Link enviado</h1>
-          <p className="text-sm text-muted-foreground">
-            Abra seu e-mail e clique no link para entrar. Ele vale por pouco
-            tempo e só funciona uma vez.
-          </p>
-        </div>
-
-        {showAddress(to) && (
-          <>
-            <Separator />
-            <div className="flex flex-col gap-1">
-              <span className="text-xs">Enviado para</span>
-              <span className="font-mono text-xs text-muted-foreground">
-                {to}
-              </span>
-            </div>
-          </>
-        )}
-
-        <Link href="/login" className={buttonVariants({ variant: "outline" })}>
-          Pedir outro link
-        </Link>
       </Card>
     </Centered>
   );

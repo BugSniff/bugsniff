@@ -1,7 +1,7 @@
 /**
- * The words this screen may say, and the rule that keeps them ours.
+ * The words the public funnel may say, and the rule that keeps them ours.
  *
- * Everything on the login screen that varies arrives in the query string — the
+ * Everything that varies on these screens arrives in the query string — the
  * address a link was sent to, why a link no longer opens, why one could not be
  * sent — and a query string is written by whoever wrote the link. So nothing
  * from the URL is ever printed: it is looked up here, and a value that matches
@@ -52,3 +52,25 @@ export const refusalHeading = (code: string): string =>
  */
 export const showAddress = (value: string): boolean =>
   value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+/**
+ * Why a scan could not be started, in words the person can act on.
+ *
+ * The first five are `TargetRejection` from `@/packages/scan/target-url`, which
+ * is already a closed set — the codes go in the URL unchanged and are read back
+ * through here.
+ */
+const SCAN_REFUSALS: Record<string, string> = {
+  malformed: "Isso não parece um endereço. Tente algo como loja.com.br",
+  "unsupported-scheme": "Só examinamos endereços http e https.",
+  "unsupported-port": "Só examinamos endereços nas portas padrão.",
+  unresolvable: "Não encontramos esse endereço. Confira se está escrito certo.",
+  "private-address":
+    "Esse endereço não é público, então não há o que examinar.",
+  "nao-registrado": "Não conseguimos registrar o exame. Tente de novo.",
+  "sem-organizacao": "Sua conta não está ligada a nenhuma organização.",
+  "nao-enviado": "Não conseguimos enviar o link agora. Tente de novo.",
+};
+
+export const scanRefusal = (code: string): string =>
+  SCAN_REFUSALS[code] ?? "Não conseguimos começar o exame. Tente de novo.";

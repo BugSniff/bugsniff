@@ -1,15 +1,21 @@
 import { describe, expect, test } from "vitest";
-import { refusalHeading, sendFailure, sendMessage, showAddress } from "./copy";
+import {
+  refusalHeading,
+  scanRefusal,
+  sendFailure,
+  sendMessage,
+  showAddress,
+} from "./copy";
 
 /**
  * One rule, tested from every direction it can be broken: nothing a stranger
- * writes into the URL of this page ever reaches the screen.
+ * writes into the URL of these pages ever reaches the screen.
  *
  * It was broken once already — the refusal arrived as a sentence and was
  * rendered as the heading of the card, so a crafted link could put any words
  * at the top of our login screen in 20px semibold.
  */
-describe("what the login screen may say", () => {
+describe("what the public funnel may say", () => {
   test("names the failures it distinguishes", () => {
     expect(sendFailure("over_email_send_rate_limit")).toBe("muitos");
     expect(sendMessage("muitos")).toContain("Pedidos demais");
@@ -27,6 +33,7 @@ describe("what the login screen may say", () => {
     ]) {
       expect(sendMessage(crafted)).toBe(SAFE_SEND);
       expect(refusalHeading(crafted)).toBe(SAFE_REFUSAL);
+      expect(scanRefusal(crafted)).toBe(SAFE_SCAN);
     }
   });
 
@@ -56,3 +63,4 @@ describe("what the login screen may say", () => {
 
 const SAFE_SEND = "Não conseguimos enviar o link agora. Tente de novo.";
 const SAFE_REFUSAL = "Este link não vale mais";
+const SAFE_SCAN = "Não conseguimos começar o exame. Tente de novo.";

@@ -28,6 +28,17 @@ As telas propostas ficam em `docs/design/`, geradas por
 `node docs/design/build.mjs`. Os valores das peças saem de `components/ui/*`:
 mexeu no componente, mexe em `_parts.mjs`.
 
+### Achados e eval
+
+O achado é redigido por modelo — Groq, `openai/gpt-oss-120b` — que só escreve a
+prosa e escolhe o trecho da norma. O fato, a evidência e a citação saem de
+código, e nada é gravado nem exibido sem passar pelo validador
+([ADR-0001](./docs/adr/0001-ia-fora-do-caminho-da-conclusao.md)).
+
+`pnpm test` não chama modelo nenhum. `pnpm eval` chama, precisa de
+`GROQ_API_KEY`, e reprova abaixo do piso de nota — é ele que pega a regressão
+de redação que o typecheck não vê.
+
 ### Artefatos visuais
 
 Pedido de artefato, diagrama, página ou mockup vira **arquivo HTML em

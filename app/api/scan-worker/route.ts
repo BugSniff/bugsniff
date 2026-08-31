@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { deriveFindings } from "@/packages/finding";
 import { runScan, type ConsentPhase } from "@/packages/scan/scan";
 import { createAdminClient } from "@/packages/supabase/admin";
 
@@ -147,7 +148,48 @@ async function work({ supabase }: Worker, scanId: string) {
     )
     .eq("id", scanId);
 
+  // Findings come after the reading is already on screen, not before it.
+  // Writing them is a second round trip to a model, and holding the whole
+  // result back for it would trade a page that fills in for a page that waits.
+  if (scan.ok) await recordFindings({ supabase }, scanId, scan);
+
   after(() => dispatch());
+}
+
+/**
+ * Writes the findings this reading supports, and only the publishable ones.
+ *
+ * The validator inside `deriveFindings` is what stands between a model's
+ * sentence and somebody's report; a rejected finding is dropped here and never
+ * reaches the table (ADR-0001).
+ */
+async function recordFindings(
+  { supabase }: Worker,
+  scanId: string,
+  scan: Extract<Awaited<ReturnType<typeof runScan>>, { ok: true }>
+) {
+  const { data: trackers } = await supabase
+    .from("trackers")
+    .select("name, cookie_pattern, host_pattern");
+
+  const { approved } = await deriveFindings(
+    {
+      cookies: scan.cookies,
+      requests: scan.requests,
+      policy: {
+        text: "text" in scan.policy ? scan.policy.text : null,
+        url: "url" in scan.policy ? scan.policy.url : null,
+      },
+    },
+    trackers ?? []
+  );
+
+  if (approved.length > 0) {
+    await supabase
+      .from("scans")
+      .update({ findings: approved })
+      .eq("id", scanId);
+  }
 }
 
 /** Takes a slot for the oldest waiting scan, if any slot is free. */

@@ -28,6 +28,30 @@ describe("a finding that states a fact and cites a real excerpt", () => {
     expect(rejected).toEqual([]);
   });
 
+  // Regression: the law is typeset, and a passage copied out of it comes back
+  // with the typesetting. The words were identical and the finding was rejected.
+  test("is approved when the excerpt differs only in typography", () => {
+    const { approved, rejected } = validateFindings(
+      [
+        {
+          ...soundFinding,
+          normId: "typografia",
+          normExcerpt:
+            "observar a boa\u2011f\u00e9\u00a0e os\u200b seguintes \u201cprinc\u00edpios\u201d",
+        },
+      ],
+      new Map([
+        [
+          "typografia",
+          'Dever\u00e3o observar a boa-f\u00e9 e os seguintes "princ\u00edpios": ...',
+        ],
+      ])
+    );
+
+    expect(rejected).toEqual([]);
+    expect(approved).toHaveLength(1);
+  });
+
   test("is approved even though the quoted excerpt carries legal wording", () => {
     // The excerpt is verbatim law and may contain the very words the product
     // may not write. Scanning it would reject every correct finding.

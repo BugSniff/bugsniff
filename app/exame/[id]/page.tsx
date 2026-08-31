@@ -8,6 +8,7 @@ import type {
   PolicyReading,
   ScanRejection,
 } from "@/packages/scan/scan";
+import type { Finding } from "@/packages/finding-validator";
 import { registrableDomain } from "@/packages/scan/third-party";
 import {
   nameCookie,
@@ -62,7 +63,7 @@ export default async function ScanPage({
   const { data: scan } = await supabase
     .from("scans")
     .select(
-      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, evidence_pre_path, evidence_post_path, failure"
+      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, evidence_pre_path, evidence_post_path, failure, findings"
     )
     .eq("id", id)
     .maybeSingle();
@@ -160,6 +161,7 @@ export default async function ScanPage({
             state={scan.consent_banner}
             platform={scan.consent_platform}
           />
+          <Findings findings={(scan.findings ?? []) as Finding[]} />
           <BeforeConsent
             cookies={cookies}
             requests={requests}
@@ -419,6 +421,51 @@ function Requests({
  * "Esta loja não tem banner" would be an assertion about the store, and that
  * one does not get made without a human having looked.
  */
+/**
+ * The audit's output: what was observed, and the norm that addresses it.
+ *
+ * Read the shape carefully, because it is the product's whole legal posture.
+ * There is a fact, there is an excerpt of the law, and there is nothing
+ * joining them into a verdict — no "portanto", no severity, no colour that
+ * means trouble. The reader is left holding both halves, which is the only
+ * position we may leave them in: concluding about somebody's concrete case is
+ * the advocacy's competence, not ours (ADR-0001).
+ *
+ * Everything here already passed the validator before it was written to the
+ * scan. This component only renders.
+ */
+function Findings({ findings }: { findings: Finding[] }) {
+  if (findings.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-4">
+      <h2 className="text-sm font-medium">
+        {findings.length === 1 ? "1 achado" : `${findings.length} achados`}
+      </h2>
+
+      <ol className="flex flex-col gap-4">
+        {findings.map((finding, index) => (
+          <li
+            key={index}
+            className="border-l-2 border-amber-500 pl-4 flex flex-col gap-2"
+          >
+            <p className="text-sm">{finding.observedFact}</p>
+            <p className="text-xs text-zinc-500">{finding.evidence}</p>
+            <figure className="flex flex-col gap-1">
+              <blockquote className="text-xs text-zinc-600 dark:text-zinc-400">
+                “{finding.normExcerpt}”
+              </blockquote>
+              <figcaption className="text-xs text-zinc-500">
+                {finding.normCitation}
+              </figcaption>
+            </figure>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function BannerNote({
   state,
   platform,

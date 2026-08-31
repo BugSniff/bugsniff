@@ -1,7 +1,15 @@
+import { IconAlertCircle, IconMail } from "@tabler/icons-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Mark } from "@/components/brand";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/packages/supabase/server";
+import { refusalHeading, sendFailure, sendMessage, showAddress } from "./copy";
 import { SubmitButton } from "../submit-button";
 
 /**
@@ -26,16 +34,28 @@ async function sendLink(formData: FormData) {
     options: { emailRedirectTo: `${origin}/auth/callback` },
   });
 
-  if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
-  redirect("/login?enviado=1");
+  // A code, not Supabase's own sentence: what goes in the URL comes back out
+  // on this page, and a message passed through would let anyone craft a link
+  // that makes the login screen say whatever they like.
+  if (error) redirect(`/login?erro=${sendFailure(error.code ?? "")}`);
+  redirect(`/login?enviado=${encodeURIComponent(email)}`);
+}
+
+/** The public funnel is a column, centred, with nothing else on the screen. */
+function Centered({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="flex flex-1 flex-col items-center justify-center p-10">
+      {children}
+    </main>
+  );
 }
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; enviado?: string }>;
+  searchParams: Promise<{ erro?: string; enviado?: string; expirado?: string }>;
 }) {
-  const { error, enviado } = await searchParams;
+  const { erro, enviado, expirado } = await searchParams;
 
   // Someone already signed in has nothing to do here, and sending them a link
   // to prove what the session already proves only spends quota.
@@ -46,55 +66,155 @@ export default async function LoginPage({
 
   if (user) redirect("/");
 
+  // Three screens, not three notices inside one form. Each is a different
+  // moment: asking, having asked, and finding that the link no longer works.
+  if (enviado !== undefined) return <LinkSent to={enviado} />;
+  if (expirado !== undefined) return <LinkExpired refusal={expirado} />;
+
   return (
-    <main className="mx-auto flex flex-1 w-full max-w-sm flex-col justify-center gap-6 px-6">
-      <div>
-        <h1 className="text-2xl font-semibold">bugsniff</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Entre com seu e-mail. Enviamos um link e você não precisa de senha.
-        </p>
-      </div>
+    <Centered>
+      <Card className="w-[420px] gap-4 px-6">
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-xl font-semibold">Entrar no bugsniff</h1>
+          <p className="text-sm text-muted-foreground">
+            Sem senha. Mandamos um link para o seu e-mail e ele é a sua entrada.
+          </p>
+        </div>
 
-      {enviado ? (
-        <p
-          role="status"
-          className="rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800"
-        >
-          Link enviado. Abra seu e-mail para entrar — ele vale por pouco tempo e
-          só funciona uma vez.
-        </p>
-      ) : (
-        <form action={sendLink} className="flex flex-col gap-3">
-          <input
-            type="email"
-            name="email"
-            required
-            autoComplete="email"
-            placeholder="seu@email.com"
-            className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-          />
+        <form action={sendLink} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="email">E-mail</Label>
+            <Input
+              id="email"
+              type="email"
+              name="email"
+              required
+              autoComplete="email"
+              autoFocus
+              placeholder="seu@email.com"
+            />
+          </div>
 
-          {error && (
-            <p role="alert" className="text-sm text-red-600">
-              {error}
+          {erro && (
+            <p role="alert" className="text-sm text-destructive">
+              {sendMessage(erro)}
             </p>
           )}
 
           <SubmitButton
             working="Enviando…"
-            className="rounded-lg bg-zinc-900 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className={buttonVariants({ size: "lg", className: "w-full" })}
           >
-            Enviar link de acesso
+            Mandar o link
           </SubmitButton>
         </form>
-      )}
 
-      <p className="text-sm text-zinc-500">
-        <Link href="/" className="underline">
-          Examinar uma loja
-        </Link>{" "}
-        sem entrar primeiro.
-      </p>
-    </main>
+        <p className="text-xs text-muted-foreground">
+          Quem ainda não tem conta entra pelo mesmo campo: o primeiro link cria
+          a organização.
+        </p>
+      </Card>
+    </Centered>
+  );
+}
+
+/**
+ * The person is about to leave for somewhere that is not ours.
+ *
+ * Which is the whole reason this is a screen of its own and not a line above
+ * the form: the next thing they do happens in their inbox, and a notice
+ * stacked on top of a form they already submitted invites them to submit it
+ * again — two links in the inbox, and no way to tell which one is theirs.
+ */
+function LinkSent({ to }: { to: string }) {
+  return (
+    <Centered>
+      <Card className="w-[460px] items-start gap-4 px-6">
+        <Mark size="lg">
+          <IconMail size={20} stroke={2} />
+        </Mark>
+
+        <div className="flex flex-col gap-2">
+          <h1 className="text-xl font-semibold">Link enviado</h1>
+          <p className="text-sm text-muted-foreground">
+            Abra seu e-mail e clique no link para entrar. Ele vale por pouco
+            tempo e só funciona uma vez.
+          </p>
+        </div>
+
+        {showAddress(to) && (
+          <>
+            <Separator />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs">Enviado para</span>
+              <span className="font-mono text-xs text-muted-foreground">
+                {to}
+              </span>
+            </div>
+          </>
+        )}
+
+        <Link href="/login" className={buttonVariants({ variant: "outline" })}>
+          Pedir outro link
+        </Link>
+      </Card>
+    </Centered>
+  );
+}
+
+/**
+ * A link that no longer works, said as a fact about the link.
+ *
+ * Not "algo deu errado": expiry and single use are how the link is supposed to
+ * behave, and a person who reads why it stopped working knows they did nothing
+ * wrong. The field is right here because the only thing to do about it is ask
+ * for another one.
+ *
+ * The red is one of the two places it may appear — a link that no longer opens
+ * is our own machinery failing the person, not a reading of their store
+ * (ADR-0005).
+ */
+function LinkExpired({ refusal }: { refusal: string }) {
+  return (
+    <Centered>
+      <Card className="w-[460px] items-start gap-4 px-6">
+        <Mark size="lg" className="bg-destructive/10 text-destructive">
+          <IconAlertCircle size={20} stroke={2} />
+        </Mark>
+
+        <div className="flex flex-col gap-2">
+          <h1 role="alert" className="text-xl font-semibold">
+            {refusalHeading(refusal)}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Um link de entrada vale por uma hora e por um clique só. Se você já
+            tinha aberto ele antes, ou se pediu outro depois, este aqui deixou
+            de valer.
+          </p>
+        </div>
+
+        <form action={sendLink} className="flex w-full flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="email">E-mail</Label>
+            <Input
+              id="email"
+              type="email"
+              name="email"
+              required
+              autoComplete="email"
+              autoFocus
+              placeholder="seu@email.com"
+            />
+          </div>
+
+          <SubmitButton
+            working="Enviando…"
+            className={buttonVariants({ className: "w-full" })}
+          >
+            Mandar um link novo
+          </SubmitButton>
+        </form>
+      </Card>
+    </Centered>
   );
 }

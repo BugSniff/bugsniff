@@ -2,6 +2,7 @@ import { IconAlertCircle } from "@tabler/icons-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { ScoreCard } from "@/components/score-card";
 import { NewScan } from "@/components/new-scan";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { trackersIn, type Exam } from "@/lib/exams";
+import { scoreOf } from "@/lib/score";
 import type { ConsentBannerState, ConsentPhase } from "@/packages/scan/scan";
 import { createClient } from "@/packages/supabase/server";
 import type { Tracker } from "@/packages/tracker";
@@ -58,7 +60,7 @@ export default async function StorePage({
       supabase
         .from("scans")
         .select(
-          "id, url, status, consent_banner, policy_state, cookies, requests, created_at, store_id"
+          "id, url, status, consent_banner, policy_state, policy_text, cookies, requests, created_at, store_id"
         )
         .eq("store_id", id)
         .order("created_at", { ascending: false }),
@@ -68,6 +70,9 @@ export default async function StorePage({
   if (!store) notFound();
 
   const readings = (exams ?? []) as Exam[];
+  // The score is of a reading, not of a store: it says where the most recent
+  // one left the shop, and the table below says how it got there.
+  const latest = readings.find((exam) => exam.status === "done");
 
   return (
     <AppShell
@@ -99,6 +104,12 @@ export default async function StorePage({
           url={store.host}
         />
       </div>
+
+      {latest && (
+        <Card className="px-6">
+          <ScoreCard score={scoreOf(latest, (trackers ?? []) as Tracker[])} />
+        </Card>
+      )}
 
       <Card className="gap-0 p-0">
         <div className="overflow-x-auto">

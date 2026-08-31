@@ -97,6 +97,10 @@ _Avoid_: cookie banner, pop-up, aviso de cookies, modal
 Os rastreadores que o banner impede de disparar enquanto não houver consentimento.
 _Avoid_: whitelist, filtro, regras
 
+**Pontuação** (`Score`):
+Nota de 0 a 100 atribuída a uma leitura da loja, composta em código a partir do que o exame mediu. Diferente do achado, ela conclui — e por isso existe num lugar só, registrada na [ADR-0006](./docs/adr/0006-pontuacao-de-conformidade.md).
+_Avoid_: nota de risco, selo, índice de conformidade, score
+
 **Relatório** (`Report`):
 Apresentação dos achados de um exame para leitura humana. Pode sair com a marca da agência.
 _Avoid_: laudo, diagnóstico, dossiê

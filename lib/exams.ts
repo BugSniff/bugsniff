@@ -8,6 +8,7 @@ export type Exam = {
   status: string;
   consent_banner: ConsentBannerState | null;
   policy_state: string | null;
+  policy_text?: string | null;
   cookies: { name: string; phase?: ConsentPhase }[] | null;
   requests: { host: string; phase?: ConsentPhase }[] | null;
   created_at: string;

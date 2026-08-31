@@ -42,6 +42,14 @@ const PAPER_CSS = `
 .paper .shot { border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px #e7e2e6; }
 .paper .shot img { display: block; width: 100%; }
 .paper .stack { display: flex; flex-direction: column; gap: 28px; }
+.paper .score { display: flex; align-items: baseline; gap: 8px; }
+.paper .score .num { font-size: 44px; font-weight: 600; line-height: 1;
+  font-family: "Noto Sans", ui-sans-serif, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.paper .dims { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.paper .dims li { display: flex; justify-content: space-between; gap: 16px;
+  padding-bottom: 8px; border-bottom: 1px solid #f0ecef; }
+.paper .dims li:last-child { border-bottom: 0; }
+.paper .dims .pts { font-variant-numeric: tabular-nums; white-space: nowrap; color: #6b5f68; }
 @page { size: A4; margin: 0; }
 `;
 
@@ -64,7 +72,7 @@ export function ReportPaper({
   /** The store's own screen at the first reading, when there is one. */
   banner?: string | null;
 }) {
-  const { store, at, counts, summary, disclosure, findings } = report;
+  const { store, at, counts, summary, disclosure, findings, score } = report;
 
   return (
     <>
@@ -123,6 +131,49 @@ export function ReportPaper({
               <span className="num">{counts.trackers}</span>
               <span className="small">rastreadores nomeados</span>
             </div>
+          </div>
+
+          <div className="col" style={{ gap: 12 }}>
+            <h2>Pontuação desta leitura</h2>
+            {score.value === null ? (
+              <p className="lede">
+                Sem nota nesta leitura. Metade da pontuação é a distância entre
+                o que a loja faz e o que ela declara, e nosso navegador não
+                chegou à política desta loja — com {score.measured} dos 100
+                pontos medidos, um número aqui diria mais do que sabemos.
+              </p>
+            ) : (
+              <div className="score">
+                <span className="num">{score.value}</span>
+                <span className="sub">/ 100</span>
+              </div>
+            )}
+            {/* The sentence that separates this number from a legal opinion.
+                It travels with the number, at every size (ADR-0006). */}
+            <p className="sub small">
+              Pontuação técnica composta pelo bugsniff a partir do que o
+              navegador observou, com peso definido por nós e não pela lei. Não
+              constitui parecer jurídico nem avaliação da situação legal da
+              loja.
+              {score.value !== null && score.measured < 100
+                ? ` Nesta leitura foi possível medir ${score.measured} dos 100 pontos.`
+                : ""}
+            </p>
+            <ul className="dims">
+              {score.dimensions.map((dimension) => (
+                <li key={dimension.key}>
+                  <span className="col" style={{ gap: 2 }}>
+                    <span>{dimension.label}</span>
+                    <span className="sub small">{dimension.norm}</span>
+                  </span>
+                  <span className="pts small">
+                    {dimension.earned === null
+                      ? "não medido"
+                      : `${dimension.earned} / ${dimension.weight}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className="col" style={{ gap: 10 }}>

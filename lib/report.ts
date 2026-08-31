@@ -1,6 +1,7 @@
 import { observe, type Reading } from "@/packages/finding";
 import type { Finding } from "@/packages/finding-validator";
 import type { ConsentBannerState, ConsentPhase } from "@/packages/scan/scan";
+import { scoreOf, type Score } from "@/lib/score";
 import { namedTrackers, type Tracker } from "@/packages/tracker";
 
 /**
@@ -37,6 +38,8 @@ export type Report = {
   disclosure: string | null;
   /** Only findings the validator approved ever reach here (ADR-0001). */
   findings: Finding[];
+  /** The one place in the product that concludes, and it is on the paper too. */
+  score: Score;
 };
 
 const before = <T extends { phase?: ConsentPhase }>(items: T[] | null) =>
@@ -142,5 +145,6 @@ export function reportOf(scan: Reported, trackers: readonly Tracker[]): Report {
     summary: summarise(counts, names, scan.consent_banner),
     disclosure: disclosure(scan, names, trackers),
     findings: scan.findings ?? [],
+    score: scoreOf(scan, trackers),
   };
 }

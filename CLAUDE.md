@@ -27,6 +27,7 @@ existe. Ver [ADR-0005](./docs/adr/0005-sistema-visual-e-a-cor-que-nao-conclui.md
 As telas propostas ficam em `docs/design/`, geradas por
 `node docs/design/build.mjs`. Os valores das peças saem de `components/ui/*`:
 mexeu no componente, mexe em `_parts.mjs`.
+
 ### Achados e eval
 
 O achado é redigido por modelo — Groq, `openai/gpt-oss-120b` — que só escreve a

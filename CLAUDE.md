@@ -14,6 +14,19 @@ The five canonical triage roles, each label string equal to its name. See `docs/
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Telas e sistema visual
+
+shadcn/ui pelo preset `bkWtWhvox`: estilo base-maia, base mauve, ícones Tabler,
+Public Sans no corpo e Noto Sans nos títulos. Tokens em `app/globals.css`,
+componentes em `components/ui/`.
+
+**Nenhuma cor significa conformidade** — o âmbar marca ação e o estado
+pré-consentimento, o vermelho só erro de sistema e ação destrutiva, e verde não
+existe. Ver [ADR-0005](./docs/adr/0005-sistema-visual-e-a-cor-que-nao-conclui.md).
+
+As telas propostas ficam em `docs/design/`, geradas por
+`node docs/design/build.mjs`. Os valores das peças saem de `components/ui/*`:
+mexeu no componente, mexe em `_parts.mjs`.
 ### Achados e eval
 
 O achado é redigido por modelo — Groq, `openai/gpt-oss-120b` — que só escreve a

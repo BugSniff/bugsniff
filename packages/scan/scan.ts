@@ -4,7 +4,7 @@ import {
   acceptConsentBanner,
   detectConsentPlatform,
 } from "./lib/consent-banner";
-import { readPolicy, type PolicyReading } from "./lib/policy";
+import { findPolicyLink, readPolicy, type PolicyReading } from "./lib/policy";
 import { thirdPartyHosts } from "./third-party";
 import { parseTargetUrl, type TargetRejection } from "./target-url";
 
@@ -274,6 +274,13 @@ export async function observeStore(
       // The screen missing an early update is not worth losing the scan over.
     });
 
+    // Harvested before the banner is answered, because answering it can take
+    // the link away: a consent banner is a common — sometimes the only — place
+    // a shop links its policy by name, and accepting it removes the banner and
+    // the link with it. Opening it now would navigate away mid-reading, so
+    // only the address is kept; `readPolicy` follows it at the end.
+    const policyLink = await findPolicyLink(page);
+
     const platform = await detectConsentPlatform(
       page,
       beforeConsent.map(({ name }) => name)
@@ -301,7 +308,7 @@ export async function observeStore(
         requests: asRequests(beforeHosts, "pre-consent"),
         // Last, because it navigates away: anything measured after this would
         // be measuring the policy page instead of the shop.
-        policy: await readPolicy(page),
+        policy: await readPolicy(page, policyLink),
       };
     }
 
@@ -327,7 +334,7 @@ export async function observeStore(
       consentBanner: "accepted",
       consentPlatform: platform,
       evidence: { preConsent: beforeScreen, postConsent: afterScreen },
-      policy: await readPolicy(page),
+      policy: await readPolicy(page, policyLink),
       requests: [
         ...asRequests(beforeHosts, "pre-consent"),
         ...asRequests(afterHosts, "post-consent"),

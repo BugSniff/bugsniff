@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
 /**
@@ -11,6 +11,11 @@ import type { AddressInfo } from "node:net";
  *
  * Served on loopback, which is why the tests drive `observeStore` rather than
  * `runScan`: the URL guard refuses private addresses, and rightly so.
+ *
+ * One server per shop, not one server with a path per shop. The policy search
+ * ends by trying addresses on the shop's own origin, so a shared origin would
+ * let one shop's published policy answer for a shop that publishes none — and
+ * the test that matters most here is the one that has to keep finding nothing.
  */
 
 /** Fires on every load, before anything is asked. */
@@ -39,12 +44,22 @@ const TRACKERS = `<script>
   function consent(choice) {
     document.cookie = "fixture_consent=" + choice + "; path=/; max-age=3600";
     var banner = document.getElementById("banner");
-    if (banner) banner.hidden = true;
+    // Removed, not hidden, because that is what a consent platform does — and
+    // it takes with it any link the banner was carrying.
+    if (banner) banner.remove();
   }
-  // A banner arrives with its vendor's script, never with the page.
+  // A banner arrives with its vendor's script, never with the page — and never
+  // again once it has been answered. The scan reloads the store after
+  // accepting, and a banner that came back on that load would hand the scan a
+  // second chance at every link it was carrying, which no real platform gives.
   function showBannerLater() {
+    var banner = document.getElementById("banner");
+    // Gone from the document, not merely hidden: a hidden element still
+    // carries its text and its links, and a scan reading textContent would
+    // keep finding a link the visitor can no longer see.
+    if (document.cookie.includes("fixture_consent=")) return banner.remove();
     setTimeout(function () {
-      document.getElementById("banner").hidden = false;
+      banner.hidden = false;
     }, 300);
   }
 </script>`;
@@ -164,6 +179,126 @@ const POLICY = `<!doctype html>
 `;
 
 /**
+ * The shop whose only link to the policy is inside the banner.
+ *
+ * Measured on duxhumanhealth.com. Nothing in the footer names the document;
+ * the one link that does sits in the consent banner and leaves with it the
+ * moment the banner is accepted — which is exactly when the scan used to go
+ * looking. The link has to be harvested before the click or it does not exist.
+ *
+ * Published at an address no guess would reach, on purpose: with the policy at
+ * a predictable slug the search finds it anyway, and the test would pass with
+ * the harvest torn out.
+ */
+const UNGUESSABLE = "/institucional/documentos/lgpd-2026";
+
+const POLICY_IN_BANNER = html(`
+<div id="banner" hidden style="${BANNER_STYLE}">
+  <p>Este site usa cookies. Leia a
+    <a href="${UNGUESSABLE}">Política de Privacidade</a>.</p>
+  <button onclick="consent('all')">Aceitar todos</button>
+</div>
+<script>showBannerLater()</script>
+`);
+
+/**
+ * A shop whose only link to the policy says just "Privacidade".
+ *
+ * Measured on duxhumanhealth.com too: a word that names a subject, not a
+ * document — and it opens the policy directly, which used to be thrown away
+ * for not linking to itself.
+ */
+const ONLY_PRIVACIDADE = `<footer><a href="/privacidade">Privacidade</a></footer>`;
+
+const IS_THE_POLICY = `<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Privacidade</title></head>
+<body>
+<main>
+  <h1>Privacidade</h1>
+  <p>${POLICY_BODY}</p>
+  <p>Tratamento de dados conforme a Lei nº 13.709 e os direitos do titular.</p>
+</main>
+</body>
+</html>
+`;
+
+/**
+ * And the shop that must keep answering "not-found".
+ *
+ * Measured on lustresgenesis.com.br: the only footer link matching the hub
+ * pattern is "Políticas de Trocas e Devoluções", a page long enough to pass a
+ * length check on its own. Reading it as the privacy policy would put the
+ * wrong text under every comparison the audit makes.
+ */
+const ONLY_TROCAS = `<footer><a href="/trocas">Políticas de Trocas e Devoluções</a></footer>`;
+
+const IS_NOT_THE_POLICY = `<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Trocas e Devoluções</title></head>
+<body>
+<main>
+  <h1>Políticas de Trocas e Devoluções</h1>
+  <p>${`O produto pode ser devolvido em até sete dias corridos a contar do
+recebimento, desde que esteja em sua embalagem original e sem sinais de uso. `.repeat(
+    6
+  )}</p>
+</main>
+</body>
+</html>
+`;
+
+/**
+ * The shop whose footer link points at the cookie page, not the policy.
+ *
+ * Measured on sephora.com.br: the footer reads "Privacidade e Cookies" and
+ * opens a page titled "Cookies", long enough to pass a length check and
+ * talkative enough about dados pessoais to pass a vocabulary one. The real
+ * policy was published all along, and the search had already stopped. What
+ * separates the two is the only thing the cookie page will not claim: the
+ * title.
+ */
+const COOKIES_LINK = `<footer><a href="/cookies">Privacidade e Cookies</a></footer>`;
+
+const IS_THE_COOKIE_PAGE = `<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Cookies</title></head>
+<body>
+<main>
+  <h1>Cookies</h1>
+  <p>${`Usamos cookies próprios e de terceiros nesta loja. Alguns tratam dados
+pessoais e você pode gerenciar suas escolhas de privacidade a qualquer momento
+nesta página. `.repeat(4)}</p>
+</main>
+</body>
+</html>
+`;
+
+/**
+ * The shop that answers 200 to every address, with its home page.
+ *
+ * The trap that blind address probing walks into: ask a single-page store for
+ * `/politica-de-privacidade` and it hands back the shop, which is long and
+ * talks about dados pessoais because its cookie notice does. Filed as the
+ * published policy, it would put the shop's own marketing under every
+ * comparison the audit makes.
+ */
+const CATCH_ALL = `<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Loja de teste</title></head>
+<body>
+<h1>Loja de teste</h1>
+<main>
+  <p>${`Aqui você encontra as melhores ofertas. Respeitamos sua privacidade e
+tratamos dados pessoais com cuidado em toda a navegação da loja. `.repeat(
+    8
+  )}</p>
+</main>
+</body>
+</html>
+`;
+
+/**
  * A shop that refuses our browser.
  *
  * Answers 403 with a page of its own — title, body, and a cookie. Read without
@@ -188,64 +323,119 @@ const REFUSED = `<!doctype html>
  */
 const FOOTER_TRAP = `<footer><a href="#" onclick="consent('all')">Aceito os termos de uso</a></footer>`;
 
-const PAGES: Record<string, string> = {
-  "/": WITH_BANNER.replace("</body>", `${POLICY_LINK}</body>`),
-  "/politica-de-privacidade": POLICY,
-  "/homemade": HOMEMADE,
-  "/iframe": IN_IFRAME,
-  "/banner-frame": BANNER_FRAME,
-  "/unclickable": UNCLICKABLE.replace("</body>", `${FOOTER_TRAP}</body>`),
-  "/no-banner": NO_BANNER.replace("</body>", `${FOOTER_TRAP}</body>`),
+const withFooter = (page: string, footer: string) =>
+  page.replace("</body>", `${footer}</body>`);
+
+type Shop = {
+  pages: Record<string, string>;
+  /** Answered for every address, when this shop is one that never 404s. */
+  catchAll?: string;
+  /** Answered with 403, as a shop that refuses our browser does. */
+  refuses?: boolean;
 };
 
-/** The paths that answer with something other than a store. */
-const REFUSING = "/refused";
-
-export type FixtureStore = {
+/**
+ * Every shop, by the name the tests know it as.
+ *
+ * Each one gets its own server, and therefore its own origin: the search for a
+ * policy ends by trying addresses, and an address is a fact about one shop.
+ */
+const SHOPS = {
   /** Real buttons, with the refusal listed before the accept. */
-  withBanner: URL;
+  withBanner: {
+    pages: {
+      "/": withFooter(WITH_BANNER, POLICY_LINK),
+      "/politica-de-privacidade": POLICY,
+    },
+  },
   /** No vendor, no button element: a div with an onclick. */
-  homemade: URL;
+  homemade: { pages: { "/": HOMEMADE } },
   /** The banner lives in an iframe. */
-  inIframe: URL;
+  inIframe: { pages: { "/": IN_IFRAME, "/banner-frame": BANNER_FRAME } },
   /** Consent machinery present, nothing to click, and a footer trap. */
-  unclickable: URL;
+  unclickable: { pages: { "/": withFooter(UNCLICKABLE, FOOTER_TRAP) } },
   /** Asks nothing, and carries the same footer trap. */
-  withoutBanner: URL;
+  withoutBanner: { pages: { "/": withFooter(NO_BANNER, FOOTER_TRAP) } },
   /** Answers 403 with a page that is not the store. */
-  refusing: URL;
+  refusing: { pages: {}, refuses: true },
+  /** Names the policy only inside the banner, which the accept removes. */
+  policyInBanner: {
+    pages: { "/": POLICY_IN_BANNER, [UNGUESSABLE]: POLICY },
+  },
+  /** Links the policy as plain "Privacidade", and that link is the policy. */
+  onlyPrivacidade: {
+    pages: {
+      "/": withFooter(NO_BANNER, ONLY_PRIVACIDADE),
+      "/privacidade": IS_THE_POLICY,
+    },
+  },
+  /** Links only a returns policy, which is long and is not the policy. */
+  onlyTrocas: {
+    pages: {
+      "/": withFooter(NO_BANNER, ONLY_TROCAS),
+      "/trocas": IS_NOT_THE_POLICY,
+    },
+  },
+  /** Links "Privacidade e Cookies", which opens the cookie page. */
+  cookiesFirst: {
+    pages: {
+      "/": withFooter(NO_BANNER, COOKIES_LINK),
+      "/cookies": IS_THE_COOKIE_PAGE,
+      "/politica-de-privacidade": POLICY,
+    },
+  },
+  /** Publishes a policy and links it from nowhere at all. */
+  unlinked: {
+    pages: { "/": NO_BANNER, "/politica-de-privacidade": POLICY },
+  },
+  /** Answers its home page to every address, policy included. */
+  catchAll: { pages: {}, catchAll: CATCH_ALL },
+} satisfies Record<string, Shop>;
+
+export type FixtureStore = Record<keyof typeof SHOPS, URL> & {
   close: () => Promise<void>;
 };
 
-export async function startFixtureStore(): Promise<FixtureStore> {
+function serve(shop: Shop): Promise<{ server: Server; origin: string }> {
   const server = createServer((request, response) => {
     const path = request.url ?? "/";
-    const page = PAGES[path];
-    const refused = path === REFUSING;
+    const page = shop.pages[path] ?? shop.catchAll;
 
-    response.writeHead(refused ? 403 : page ? 200 : 404, {
+    response.writeHead(shop.refuses ? 403 : page ? 200 : 404, {
       "content-type": "text/html; charset=utf-8",
     });
-    response.end(refused ? REFUSED : (page ?? "<p>not here</p>"));
+    response.end(shop.refuses ? REFUSED : (page ?? "<p>not here</p>"));
   });
 
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as AddressInfo;
-  const origin = `http://127.0.0.1:${port}`;
+  return new Promise((resolve) =>
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address() as AddressInfo;
+      resolve({ server, origin: `http://127.0.0.1:${port}` });
+    })
+  );
+}
+
+export async function startFixtureStore(): Promise<FixtureStore> {
+  const names = Object.keys(SHOPS) as (keyof typeof SHOPS)[];
+  const started = await Promise.all(names.map((name) => serve(SHOPS[name])));
+
+  const urls = Object.fromEntries(
+    names.map((name, index) => [name, new URL(started[index].origin)])
+  ) as Record<keyof typeof SHOPS, URL>;
 
   return {
-    withBanner: new URL(origin),
-    homemade: new URL(`${origin}/homemade`),
-    inIframe: new URL(`${origin}/iframe`),
-    unclickable: new URL(`${origin}/unclickable`),
-    withoutBanner: new URL(`${origin}/no-banner`),
-    refusing: new URL(`${origin}${REFUSING}`),
-    close: () => {
-      // Chromium keeps its connection alive, and `close` waits for every open
-      // one — without this the fixture never shuts down and the run hangs.
-      server.closeAllConnections();
-      return new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve()))
+    ...urls,
+    close: async () => {
+      await Promise.all(
+        started.map(({ server }) => {
+          // Chromium keeps its connection alive, and `close` waits for every
+          // open one — without this the fixture never shuts down and the run
+          // hangs.
+          server.closeAllConnections();
+          return new Promise<void>((resolve, reject) =>
+            server.close((error) => (error ? reject(error) : resolve()))
+          );
+        })
       );
     },
   };

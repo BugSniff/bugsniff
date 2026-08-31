@@ -1,4 +1,4 @@
-import type { Page } from "playwright-core";
+import type { Frame, Page } from "playwright-core";
 import { parseTargetUrl } from "../target-url";
 
 /**
@@ -7,6 +7,13 @@ import { parseTargetUrl } from "../target-url";
  * The audit compares two things: what the store does, which the readings
  * observe, and what the store declares, which lives in the published policy.
  * This is the second half arriving.
+ *
+ * Finding it is a search, not a lookup. A shop that publishes a perfectly good
+ * policy and a shop we failed to find one on come out of a lookup looking
+ * identical, and only one of them deserves what the report will say. So this
+ * asks, in order: what the banner linked before we answered it, what the page
+ * links by name, what a hub of legal pages leads to, and — last — the handful
+ * of addresses where a Brazilian shop's policy actually lives.
  */
 
 /** What a link to the policy itself says, and where it points. */
@@ -25,6 +32,29 @@ const POLICY_HREF =
  */
 const HUB_TEXT = /pol[íi]ticas|privacidade|lgpd|termos|central\s+de\s+ajuda/i;
 const HUB_HREF = /politicas|privacidade|privacy|lgpd|termos/i;
+
+/**
+ * Where a shop's policy lives when nothing on the page points at it.
+ *
+ * The last resort, and the one that turns "we found no link" into "we looked".
+ * These are not guesses at random: they are what the platforms Brazilian
+ * retail runs on mint by default — the plain slug, Shopify's `/policies/`,
+ * VTEX's `/institucional/` — plus the two spellings shops write by hand.
+ *
+ * Only reached when every link failed, and every one of them still has to
+ * prove what it is: a store that answers 200 to every address would otherwise
+ * hand us its home page and we would file it as the policy.
+ */
+const WELL_KNOWN = [
+  "/politica-de-privacidade",
+  "/politicas-de-privacidade",
+  "/politica-privacidade",
+  "/privacidade",
+  "/policies/privacy-policy",
+  "/institucional/politica-de-privacidade",
+  "/aviso-de-privacidade",
+  "/privacy-policy",
+];
 
 /** Below this, whatever we landed on is not a privacy policy. */
 const SHORTEST_POLICY = 400;
@@ -45,10 +75,21 @@ const LONGEST_POLICY = 120_000;
  */
 const POLICY_SETTLE_MS = 2_000;
 
+/**
+ * How long the search may spend trying addresses nobody linked.
+ *
+ * Every scan is one invocation with a duration to answer for (ADR-0002), and
+ * this is the only part of the search that pays for a page load per attempt.
+ * A shop that answers 404 to a guess costs nothing — the page never renders —
+ * so this budget is really about the shop that answers 200 to everything, and
+ * it stops us from spending twenty seconds proving it says nothing.
+ */
+const PROBE_BUDGET_MS = 15_000;
+
 export type PolicyReading =
   | { state: "found"; url: string; text: string }
   /**
-   * No link to a policy we could follow from the home page.
+   * We searched and did not find one.
    *
    * Which is not the same as a store without a policy, and the screen has to
    * keep saying so: this is our browser failing to find, never the store
@@ -63,20 +104,33 @@ type LinkPattern = { text: RegExp; href: RegExp };
 const POLICY: LinkPattern = { text: POLICY_TEXT, href: POLICY_HREF };
 const HUB: LinkPattern = { text: HUB_TEXT, href: HUB_HREF };
 
-/** The address a link on this page points to, for the first link that fits. */
+/**
+ * The address a link in this frame points to, for the first link that fits.
+ *
+ * Shadow roots included: a consent platform that renders its banner into one —
+ * Usercentrics does — keeps its "Política de Privacidade" in there too, and a
+ * plain `querySelectorAll` walks straight past it.
+ */
 async function findLink(
-  page: Page,
+  frame: Frame,
   pattern: LinkPattern
 ): Promise<string | null> {
-  return page
+  return frame
     .evaluate(
       (patterns) => {
         const byText = new RegExp(patterns.text, "i");
         const byHref = new RegExp(patterns.href, "i");
 
-        const links = Array.from(
-          document.querySelectorAll<HTMLAnchorElement>("a[href]")
-        );
+        const links: HTMLAnchorElement[] = [];
+        const collect = (root: Document | ShadowRoot) => {
+          links.push(...root.querySelectorAll<HTMLAnchorElement>("a[href]"));
+          root
+            .querySelectorAll("*")
+            .forEach(
+              (element) => element.shadowRoot && collect(element.shadowRoot)
+            );
+        };
+        collect(document);
 
         const label = (link: HTMLAnchorElement) =>
           (
@@ -100,6 +154,27 @@ async function findLink(
       { text: pattern.text.source, href: pattern.href.source }
     )
     .catch(() => null);
+}
+
+/**
+ * The policy link as it stands right now, anywhere on the page.
+ *
+ * Called before the banner is answered, which is the whole point of it being
+ * separate. Measured on duxhumanhealth.com: the only link that reads "Política
+ * de Privacidade" lives inside the consent banner, and accepting the banner
+ * takes it off the page — so by the time the reading is done and it is safe to
+ * navigate away, the one link that named the document is gone. Harvest it
+ * while it exists; open it later.
+ *
+ * Every frame, not just the main one, because TrustArc and some OneTrust
+ * deployments put the banner — and therefore the link — in an iframe.
+ */
+export async function findPolicyLink(page: Page): Promise<string | null> {
+  for (const frame of page.frames()) {
+    const href = await findLink(frame, POLICY);
+    if (href) return href;
+  }
+  return null;
 }
 
 /** The address to open, or null if it is one we should not be opening. */
@@ -146,28 +221,10 @@ async function open(page: Page, href: string): Promise<string | null> {
 }
 
 /**
- * Reads the policy the store publishes, if it publishes one where we can see.
- *
- * Called last, after every reading has been captured: it navigates away from
- * the store, and anything measured after this point would be measuring the
- * policy page instead of the shop.
+ * The text of whatever page we are standing on, stripped of its furniture.
  */
-export async function readPolicy(page: Page): Promise<PolicyReading> {
-  let href = await findLink(page, POLICY);
-
-  if (!href) {
-    // Nothing on the home page points at a policy. Before concluding that,
-    // follow the page that collects a shop's legal pages and look again.
-    const hub = await findLink(page, HUB);
-    if (hub && (await open(page, hub))) href = await findLink(page, POLICY);
-  }
-
-  if (!href) return { state: "not-found" };
-
-  const url = await open(page, href);
-  if (!url) return { state: "unreadable", url: href };
-
-  const text = await page
+async function readText(page: Page): Promise<string> {
+  return page
     .evaluate((limit) => {
       // Stripped in place rather than on a clone: `innerText` needs layout to
       // know where the line breaks go, and a detached copy has none. We are
@@ -189,10 +246,179 @@ export async function readPolicy(page: Page): Promise<PolicyReading> {
         .slice(0, limit);
     }, LONGEST_POLICY)
     .catch(() => "");
+}
+
+/**
+ * The words a privacy policy uses, for a page that has to identify itself.
+ *
+ * Needed only where we did not arrive by a link that said "política de
+ * privacidade" — there, the page's own vocabulary is the only evidence of what
+ * it is. Two of these, not one: a returns policy says "privacidade" in passing
+ * and is long enough to pass a length check on its own, and reading it as the
+ * privacy policy would put the wrong text under every comparison the audit
+ * makes.
+ */
+const SPEAKS_PRIVACY = [
+  /dados\s+pessoais/i,
+  /\bprivacidade\b/i,
+  /\blgpd\b/i,
+  /\btitular(es)?\s+d(os|e)\s+dados\b/i,
+  /tratamento\s+de\s+dados/i,
+  /lei\s+n?[.º°]*\s*13\.?709/i,
+];
+
+const looksLikePolicy = (text: string) =>
+  text.length >= SHORTEST_POLICY &&
+  SPEAKS_PRIVACY.filter((word) => word.test(text)).length >= 2;
+
+/** What a page calls itself, when what it is is the privacy policy. */
+const TITLES_POLICY = /privacidade|privacy|dados\s+pessoais|lgpd/i;
+
+/**
+ * Whether the page announces itself as the policy.
+ *
+ * The guard on guessing an address: a single-page store answers 200 to every
+ * address it has never heard of and serves its home page, and a home page that
+ * carries a cookie banner says "privacidade" and "dados pessoais" in it —
+ * enough to pass a vocabulary check and be filed as the published policy.
+ *
+ * And the guard on trusting a link, which is the one that was missing.
+ * Measured on sephora.com.br: the footer says "Privacidade e Cookies" and
+ * opens `/cookies/`, titled "Cookies | Sephora" — long enough to pass, and the
+ * wrong document. The real policy sat at `/institucional/politica-de-
+ * privacidade`, one guess away, and the search had already stopped.
+ */
+async function announcesPolicy(page: Page): Promise<boolean> {
+  return page
+    .evaluate((source) => {
+      const says = new RegExp(source, "i");
+      const heading = document.querySelector("h1")?.textContent ?? "";
+      return says.test(document.title) || says.test(heading);
+    }, TITLES_POLICY.source)
+    .catch(() => false);
+}
+
+/**
+ * What opening a link that named itself the policy got us.
+ *
+ * `speaks` is the page's own evidence that it is what the link said it was —
+ * its title, or the words a policy uses. A link is somebody else's claim about
+ * a page; this is the page's claim about itself, and the two disagree often
+ * enough to be worth keeping apart.
+ */
+type Opened =
+  | { state: "found"; url: string; text: string; speaks: boolean }
+  | { state: "unreadable"; url: string };
+
+/** Opens a link that named itself the policy, and reads what came back. */
+async function readNamed(page: Page, href: string): Promise<Opened> {
+  const url = await open(page, href);
+  if (!url) return { state: "unreadable", url: href };
+
+  // Before `readText`, which strips the page down to its prose.
+  const announces = await announcesPolicy(page);
+  const text = await readText(page);
 
   // A policy is a long document. Anything this short is a redirect notice, a
   // cookie wall, or a page saying the policy lives somewhere else.
   if (text.length < SHORTEST_POLICY) return { state: "unreadable", url };
 
-  return { state: "found", url, text };
+  // The title alone, not the vocabulary. A cookie page says "privacidade" and
+  // "dados pessoais" as freely as a policy does — measured on sephora.com.br,
+  // where 710 characters about cookies passed a vocabulary check. And being
+  // strict here costs nothing: a reading that fails it is kept, not dropped, so
+  // the worst case is that the search looks a little further and comes back to
+  // it.
+  return { state: "found", url, text, speaks: announces };
+}
+
+/**
+ * Reads the policy the store publishes, searching for it where it hides.
+ *
+ * Called last, after every reading has been captured: it navigates away from
+ * the store, and anything measured after this point would be measuring the
+ * policy page instead of the shop.
+ *
+ * `fromBanner` is the link harvested by `findPolicyLink` before the banner was
+ * answered — see there for why it cannot be found from here.
+ */
+export async function readPolicy(
+  page: Page,
+  fromBanner?: string | null
+): Promise<PolicyReading> {
+  const home = page.url();
+
+  // Both collected before anything navigates: the moment we follow the first
+  // candidate, the page that held the others is gone.
+  const onPage = await findLink(page.mainFrame(), POLICY);
+  const hub = await findLink(page.mainFrame(), HUB);
+
+  // Two things worth keeping while the search goes on, neither good enough to
+  // stop it. A link that named itself and then failed to open: "the store links
+  // a policy we could not read" is not "we found nothing". And a page that
+  // opened, is long enough, and never says it is the policy — which is how the
+  // cookie page behind "Privacidade e Cookies" gets filed as one. Both are
+  // reported only if nothing better turns up, so keeping looking costs a
+  // reading nothing and can only trade up.
+  let unreadable: PolicyReading | null = null;
+  let weak: PolicyReading | null = null;
+
+  const keep = (opened: Opened) => {
+    if (opened.state === "unreadable") unreadable ??= opened;
+    else weak ??= { state: "found", url: opened.url, text: opened.text };
+  };
+
+  for (const href of [fromBanner, onPage]) {
+    if (!href) continue;
+    const opened = await readNamed(page, href);
+    if (opened.state === "found" && opened.speaks) {
+      return { state: "found", url: opened.url, text: opened.text };
+    }
+    keep(opened);
+  }
+
+  // Nothing named a policy, or nothing named one that opened. Follow the page
+  // that collects a shop's legal pages and look again from there.
+  const opened = hub ? await open(page, hub) : null;
+  if (opened) {
+    const named = await findLink(page.mainFrame(), POLICY);
+    if (named) {
+      const opened = await readNamed(page, named);
+      if (opened.state === "found" && opened.speaks) {
+        return { state: "found", url: opened.url, text: opened.text };
+      }
+      keep(opened);
+    } else {
+      // Some shops link the policy once, from the footer, as plain
+      // "Privacidade" — a word that names a subject, not a document. That link
+      // *is* the policy, so what we just opened has to identify itself.
+      //
+      // Same two questions as a named link, and in the same order: what the
+      // page calls itself decides, and the vocabulary only keeps it as a
+      // fallback. A cookie page reached this way is the same wrong document.
+      const announces = await announcesPolicy(page);
+      const text = await readText(page);
+      if (looksLikePolicy(text)) {
+        if (announces) return { state: "found", url: opened, text };
+        weak ??= { state: "found", url: opened, text };
+      }
+    }
+  }
+
+  // Nothing on this shop points at its policy. It may still publish one.
+  const deadline = Date.now() + PROBE_BUDGET_MS;
+  for (const path of WELL_KNOWN) {
+    if (Date.now() > deadline) break;
+
+    const url = await open(page, new URL(path, home).href);
+    if (!url) continue;
+    if (!(await announcesPolicy(page))) continue;
+
+    const text = await readText(page);
+    if (looksLikePolicy(text)) return { state: "found", url, text };
+  }
+
+  // Nothing announced itself. A page we opened and could read still beats
+  // telling somebody we found nothing.
+  return weak ?? unreadable ?? { state: "not-found" };
 }

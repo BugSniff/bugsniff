@@ -6,6 +6,24 @@
 
 Issues live as GitHub issues in `BugSniff/bugsniff`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
+### Roteiro de conferência
+
+Toda issue termina com um **roteiro de conferência**: os passos que a pessoa
+precisa rodar com as próprias mãos. Vai no corpo do PR, onde sobrevive, e na
+mensagem que encerra o trabalho, onde é lido na hora.
+
+O roteiro cobre o que a máquina não cobriu. `pnpm check` já roda typecheck,
+fronteiras e testes, e `pnpm eval` já roda o modelo — o que sobra para o
+roteiro é o que exige uma caixa de entrada, um cartão, um domínio de verdade,
+ou o olho de alguém.
+
+Cada passo diz **onde ir, o que fazer e o que deve aparecer**: "abra `/painel`,
+a loja nova está na lista com 1 exame" é conferível, "conferir o painel" não é.
+
+Separe o que você **rodou** do que apenas **leu**. Um caminho exercitado de
+ponta a ponta e um caminho inspecionado são graus de confiança diferentes, e
+quem vai clicar merece saber qual é qual.
+
 ### Triage labels
 
 The five canonical triage roles, each label string equal to its name. See `docs/agents/triage-labels.md`.

@@ -15,7 +15,7 @@ import {
   sendMessage,
   showAddress,
 } from "@/lib/copy";
-import { SubmitButton } from "../submit-button";
+import { SubmitButton } from "@/components/submit-button";
 
 /**
  * Sends the link that is the only way in.
@@ -69,7 +69,7 @@ export default async function LoginPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) redirect("/");
+  if (user) redirect("/painel");
 
   // Three screens, not three notices inside one form. Each is a different
   // moment: asking, having asked, and finding that the link no longer works.

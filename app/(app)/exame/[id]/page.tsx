@@ -17,6 +17,8 @@ import {
   type Tracker,
 } from "@/packages/tracker";
 import { createClient } from "@/packages/supabase/server";
+import { AppShell } from "@/components/app-shell";
+import { storeName } from "@/lib/store";
 import { Watch } from "./watch";
 
 /** Why a scan came back empty-handed, in words the person can act on. */
@@ -119,79 +121,96 @@ export default async function ScanPage({
   const reading = waiting && cookies.length > 0;
 
   return (
-    <main className="mx-auto flex flex-1 w-full max-w-2xl flex-col justify-center gap-6 px-6 py-16">
+    <AppShell
+      active="/painel"
+      crumbs={
+        <>
+          <Link href="/painel" className="hover:text-foreground">
+            Painel
+          </Link>
+          <span>/</span>
+          <strong className="font-medium text-foreground">
+            {storeName(scan.url)}
+          </strong>
+        </>
+      }
+    >
       {waiting && <Watch scanId={scan.id} />}
 
-      <div>
-        <h1 className="text-2xl font-semibold">bugsniff</h1>
-        <p className="mt-1 text-sm text-zinc-500">{scan.url}</p>
-      </div>
+      <div className="flex w-full max-w-2xl flex-col gap-6">
+        <div>
+          <h1 className="font-mono text-xl font-semibold">
+            {storeName(scan.url)}
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">{scan.url}</p>
+        </div>
 
-      {waiting && (
-        <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
-          {scan.status === "pending"
-            ? "Na fila. Começa assim que uma vaga abrir."
-            : reading
-              ? "Esta é a loja antes de qualquer interação. Agora respondendo ao banner, para ver o que muda depois do consentimento…"
-              : "Abrindo a loja num navegador de verdade…"}{" "}
-          Esta página se atualiza sozinha.
-        </p>
-      )}
-
-      {scan.status === "failed" && (
-        <>
-          <p role="alert" className="text-sm text-red-600">
-            {FAILURES[scan.failure as ScanRejection] ??
-              "O exame não pôde ser concluído."}
+        {waiting && (
+          <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
+            {scan.status === "pending"
+              ? "Na fila. Começa assim que uma vaga abrir."
+              : reading
+                ? "Esta é a loja antes de qualquer interação. Agora respondendo ao banner, para ver o que muda depois do consentimento…"
+                : "Abrindo a loja num navegador de verdade…"}{" "}
+            Esta página se atualiza sozinha.
           </p>
-          {beforeShot && (
-            <Shot
-              url={beforeShot}
-              title="A tela que nosso navegador recebeu"
-              detail="no lugar da loja"
-              alt="A página de erro que a loja devolveu ao nosso navegador"
+        )}
+
+        {scan.status === "failed" && (
+          <>
+            <p role="alert" className="text-sm text-red-600">
+              {FAILURES[scan.failure as ScanRejection] ??
+                "O exame não pôde ser concluído."}
+            </p>
+            {beforeShot && (
+              <Shot
+                url={beforeShot}
+                title="A tela que nosso navegador recebeu"
+                detail="no lugar da loja"
+                alt="A página de erro que a loja devolveu ao nosso navegador"
+              />
+            )}
+          </>
+        )}
+
+        {(scan.status === "done" || reading) && (
+          <>
+            <BannerNote
+              state={scan.consent_banner}
+              platform={scan.consent_platform}
             />
-          )}
-        </>
-      )}
+            <Findings findings={(scan.findings ?? []) as Finding[]} />
+            <BeforeConsent
+              cookies={cookies}
+              requests={requests}
+              trackers={trackers ?? []}
+            />
+            <Cookies
+              cookies={cookies}
+              consentBanner={scan.consent_banner}
+              trackers={trackers ?? []}
+            />
+            <Requests
+              requests={requests}
+              consentBanner={scan.consent_banner}
+              trackers={trackers ?? []}
+            />
+            <Policy state={scan.policy_state} url={scan.policy_url} />
+            <Timeline
+              cookies={cookies}
+              beforeShot={beforeShot}
+              afterShot={afterShot}
+            />
+          </>
+        )}
 
-      {(scan.status === "done" || reading) && (
-        <>
-          <BannerNote
-            state={scan.consent_banner}
-            platform={scan.consent_platform}
-          />
-          <Findings findings={(scan.findings ?? []) as Finding[]} />
-          <BeforeConsent
-            cookies={cookies}
-            requests={requests}
-            trackers={trackers ?? []}
-          />
-          <Cookies
-            cookies={cookies}
-            consentBanner={scan.consent_banner}
-            trackers={trackers ?? []}
-          />
-          <Requests
-            requests={requests}
-            consentBanner={scan.consent_banner}
-            trackers={trackers ?? []}
-          />
-          <Policy state={scan.policy_state} url={scan.policy_url} />
-          <Timeline
-            cookies={cookies}
-            beforeShot={beforeShot}
-            afterShot={afterShot}
-          />
-        </>
-      )}
-
-      <p className="text-sm text-zinc-500">
-        <Link href="/" className="underline">
-          Examinar outra loja
-        </Link>
-      </p>
-    </main>
+        <p className="text-sm text-zinc-500">
+          <Link href="/painel" className="underline">
+            Voltar ao painel
+          </Link>
+        </p>
+      </div>
+    </AppShell>
   );
 }
 

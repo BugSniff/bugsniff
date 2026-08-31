@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   if (error) backToLogin(error.code ?? "");
 
   const claimToken = params.get("scan");
-  if (!claimToken) redirect("/");
+  if (!claimToken) redirect("/painel");
 
   // RLS scopes this to the caller, so it can only ever be their own.
   const { data: organization } = await supabase
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     .select("id")
     .maybeSingle();
 
-  if (!organization) redirect("/");
+  if (!organization) redirect("/painel");
 
   // Adopting needs the service role: `scans` has no update policy, by design.
   // The `awaiting_confirmation` condition is what makes a claim token single
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     .select("id")
     .maybeSingle();
 
-  if (!scan) redirect("/");
+  if (!scan) redirect("/painel");
 
   // Kick the queue after this response is sent, so the person is not waiting on
   // a browser to start. The worker takes a slot and returns immediately.

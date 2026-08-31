@@ -4,21 +4,24 @@ import { createAdminClient } from "@/packages/supabase/admin";
 import { createClient } from "@/packages/supabase/server";
 
 /**
- * Reasons Supabase refuses a link, in our own words.
+ * How Supabase's refusal codes map to ours.
  *
- * Its `error_description` is not reflected back to the page: it arrives in the
- * URL, so anyone could craft a link that makes the login screen say whatever
- * they like. Known codes get a message we wrote; anything else stays generic.
+ * Ours, and only three, because what goes back in the URL is a key and never a
+ * sentence: `error_description` arrives in the query, so a message passed
+ * through would let anyone craft a link that makes the login screen say
+ * whatever they like — as a heading, no less. The words live on the screen
+ * that shows them; this route only says which of them applies.
  */
 const REFUSALS: Record<string, string> = {
-  otp_expired: "O link expirou ou já foi usado. Peça outro para entrar.",
-  access_denied: "O link foi recusado. Peça outro para entrar.",
+  otp_expired: "expirado",
+  access_denied: "recusado",
 };
 
-const GENERIC = "Link inválido ou expirado. Peça outro para entrar.";
+/** Anything we do not recognise. The screen has a sentence for it. */
+const GENERIC = "invalido";
 
-function backToLogin(message: string): never {
-  redirect(`/login?error=${encodeURIComponent(message)}`);
+function backToLogin(refusal: string): never {
+  redirect(`/login?expirado=${REFUSALS[refusal] ?? GENERIC}`);
 }
 
 /**
@@ -34,16 +37,15 @@ export async function GET(request: NextRequest) {
   const code = params.get("code");
 
   if (!code) {
-    const refusal = params.get("error_code") ?? params.get("error") ?? "";
-    backToLogin(REFUSALS[refusal] ?? GENERIC);
+    backToLogin(params.get("error_code") ?? params.get("error") ?? "");
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) backToLogin(REFUSALS[error.code ?? ""] ?? GENERIC);
+  if (error) backToLogin(error.code ?? "");
 
   const claimToken = params.get("scan");
-  if (!claimToken) redirect("/");
+  if (!claimToken) redirect("/painel");
 
   // RLS scopes this to the caller, so it can only ever be their own.
   const { data: organization } = await supabase
@@ -51,7 +53,7 @@ export async function GET(request: NextRequest) {
     .select("id")
     .maybeSingle();
 
-  if (!organization) redirect("/");
+  if (!organization) redirect("/painel");
 
   // Adopting needs the service role: `scans` has no update policy, by design.
   // The `awaiting_confirmation` condition is what makes a claim token single
@@ -68,7 +70,7 @@ export async function GET(request: NextRequest) {
     .select("id")
     .maybeSingle();
 
-  if (!scan) redirect("/");
+  if (!scan) redirect("/painel");
 
   // Kick the queue after this response is sent, so the person is not waiting on
   // a browser to start. The worker takes a slot and returns immediately.

@@ -127,4 +127,11 @@
   html {
     @apply font-sans;
   }
+  /* Noto Sans nos títulos. O token existia e nada o usava, então todo h1 do
+     produto saía em Public Sans — o corpo vestido de título. */
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+  }
 }

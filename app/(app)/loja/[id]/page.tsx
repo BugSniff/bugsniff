@@ -77,6 +77,7 @@ export default async function StorePage({
   return (
     <AppShell
       active="/painel"
+      store={id}
       crumbs={
         <>
           <Link href="/painel" className="hover:text-foreground">

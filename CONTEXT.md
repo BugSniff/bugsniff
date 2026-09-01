@@ -85,6 +85,10 @@ _Avoid_: lei, regra, requisito, referência
 
 ### O que é produzido
 
+**Controlador** (`Controller`):
+A empresa que responde pelos dados tratados na loja: razão social, CNPJ, endereço, contato e encarregado. É atributo da loja e não da organização — uma agência com quarenta lojas tem quarenta controladores diferentes. Informado uma vez e reaproveitado em todos os documentos daquela loja; campo que ninguém preencheu aparece em branco no texto gerado, nunca preenchido por conta própria.
+_Avoid_: empresa, cliente, dados da conta
+
 **Documento** (`Document`):
 Política de privacidade ou termos de uso gerados para uma loja.
 _Avoid_: contrato, texto, política, arquivo

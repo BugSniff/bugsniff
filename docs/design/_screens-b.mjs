@@ -472,7 +472,9 @@ export const BannerConfiguracao = screen({
             <div class="row" style="gap: 12px">
               <div class="col" style="flex: 1; gap: 6px"><label class="label">Botão de aceite</label><div class="field filled">Aceitar tudo</div></div>
               <div class="col" style="flex: 1; gap: 6px"><label class="label">Botão de recusa</label><div class="field filled">Recusar</div></div>
+              <div class="col" style="flex: 1; gap: 6px"><label class="label">Botão de escolher</label><div class="field filled">Escolher</div></div>
             </div>
+            <p class="sub small">Os três botões saem sempre do mesmo tamanho, peso e cor. Não é configurável.</p>
           </div>
 
           <div class="card" style="gap: 14px">
@@ -494,9 +496,10 @@ export const BannerConfiguracao = screen({
               <div class="row" style="gap: 6px"><div class="block" style="flex: 1; height: 34px"></div><div class="block" style="flex: 1; height: 34px"></div></div>
               <div class="shot-banner" style="flex-direction: column; align-items: stretch; gap: 8px">
                 <span>Usamos cookies para medir audiência e mostrar anúncios. Você escolhe o que aceitar.</span>
-                <span class="row" style="gap: 6px; justify-content: flex-end">
-                  <span class="btn outline xs">Recusar</span>
-                  <span class="btn xs">Aceitar tudo</span>
+                <span class="row" style="gap: 6px">
+                  <span class="btn xs" style="flex: 1; justify-content: center">Aceitar tudo</span>
+                  <span class="btn xs" style="flex: 1; justify-content: center">Recusar</span>
+                  <span class="btn xs" style="flex: 1; justify-content: center">Escolher</span>
                 </span>
               </div>
             </div>
@@ -523,15 +526,15 @@ export const BannerBloqueio = screen({
           <span class="tag pre">7 disparavam antes da resposta</span>
         </div>
         <table>
-          <thead><tr><th>Rastreador</th><th>Como aparece</th><th>Bloqueado até responder</th></tr></thead>
+          <thead><tr><th>Rastreador</th><th>Como aparece</th><th>Finalidade</th><th>Até a pessoa responder</th></tr></thead>
           <tbody>
-            <tr><td>Meta Pixel</td><td class="dim mono small">_fbp · connect.facebook.net</td><td><span class="tag pre">bloqueado</span></td></tr>
-            <tr><td>Hotjar</td><td class="dim mono small">_hjSessionUser · script.hotjar.com</td><td><span class="tag pre">bloqueado</span></td></tr>
-            <tr><td>Google Analytics</td><td class="dim mono small">_ga · google-analytics.com</td><td><span class="tag pre">bloqueado</span></td></tr>
-            <tr><td>Criteo</td><td class="dim mono small">cto_bundle · static.criteo.net</td><td><span class="tag pre">bloqueado</span></td></tr>
-            <tr><td>TikTok</td><td class="dim mono small">_ttp · analytics.tiktok.com</td><td><span class="tag pre">bloqueado</span></td></tr>
-            <tr><td class="dim">titanpush.com</td><td class="dim mono small">track.titanpush.com</td><td><span class="tag outline">liberado</span></td></tr>
-            <tr><td class="dim">Sessão da loja</td><td class="dim mono small">session · casadobolo.com.br</td><td><span class="tag outline">nunca bloqueado</span></td></tr>
+            <tr><td>Meta Pixel</td><td class="dim mono small">_fbp · connect.facebook.net</td><td class="dim">publicidade</td><td><span class="tag pre">bloqueado</span></td></tr>
+            <tr><td>Hotjar</td><td class="dim mono small">_hjSessionUser · script.hotjar.com</td><td class="dim">medição de audiência</td><td><span class="tag pre">bloqueado</span></td></tr>
+            <tr><td>Google Analytics</td><td class="dim mono small">_ga · google-analytics.com</td><td class="dim">medição de audiência</td><td><span class="tag pre">bloqueado</span></td></tr>
+            <tr><td>Criteo</td><td class="dim mono small">cto_bundle · static.criteo.net</td><td class="dim">publicidade</td><td><span class="tag pre">bloqueado</span></td></tr>
+            <tr><td>TikTok</td><td class="dim mono small">_ttp · analytics.tiktok.com</td><td class="dim">publicidade</td><td><span class="tag pre">bloqueado</span></td></tr>
+            <tr><td class="dim">titanpush.com</td><td class="dim mono small">track.titanpush.com</td><td class="dim">não sabemos nomear</td><td><span class="tag outline">liberado</span></td></tr>
+            <tr><td class="dim">Sessão da loja</td><td class="dim mono small">session · casadobolo.com.br</td><td class="dim">necessário para a loja funcionar</td><td><span class="tag outline">nunca bloqueado</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -566,9 +569,9 @@ export const BannerPrevia = artboard({
               <span class="sub small">Você escolhe o que aceitar. Enquanto não responder, nada é acionado além do necessário para a loja funcionar.</span>
             </div>
             <div class="row" style="gap: 8px">
-              <span class="btn outline sm">Recusar</span>
-              <span class="btn outline sm">Escolher</span>
-              <span class="btn sm">Aceitar tudo</span>
+              <span class="btn sm" style="width: 132px; justify-content: center">Aceitar tudo</span>
+              <span class="btn sm" style="width: 132px; justify-content: center">Recusar</span>
+              <span class="btn sm" style="width: 132px; justify-content: center">Escolher</span>
             </div>
           </div>
         </div>

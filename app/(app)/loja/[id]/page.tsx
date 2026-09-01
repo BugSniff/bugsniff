@@ -1,4 +1,4 @@
-import { IconAlertCircle } from "@tabler/icons-react";
+import { IconAlertCircle, IconCookie } from "@tabler/icons-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -76,7 +76,7 @@ export default async function StorePage({
 
   return (
     <AppShell
-      active="/painel"
+      active="exames"
       store={id}
       crumbs={
         <>
@@ -99,11 +99,19 @@ export default async function StorePage({
           </p>
         </div>
 
-        <NewScan
-          label="Examinar de novo"
-          voltar={`/loja/${store.id}`}
-          url={store.host}
-        />
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/loja/${store.id}/banner`}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            <IconCookie size={14} stroke={2} /> Banner
+          </Link>
+          <NewScan
+            label="Examinar de novo"
+            voltar={`/loja/${store.id}`}
+            url={store.host}
+          />
+        </div>
       </div>
 
       {latest && (

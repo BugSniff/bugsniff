@@ -326,12 +326,55 @@ const FOOTER_TRAP = `<footer><a href="#" onclick="consent('all')">Aceito os term
 const withFooter = (page: string, footer: string) =>
   page.replace("</body>", `${footer}</body>`);
 
+/** Enough bytes that the parser starts before the response is over. */
+const PADDING = `<!-- ${"pad ".repeat(600)} -->`;
+
+/** Answers, writes a tracker, and never closes the document. */
+const NEVER_FINISHES = `<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Loja lenta</title>
+${PADDING}
+<script>
+  document.cookie = "${TRACKER_BEFORE}=1; path=/; max-age=3600";
+  new Image().src = "http://${THIRD_PARTY_BEFORE}/px.gif";
+</script>
+</head>
+<body><h1>Loja lenta</h1>
+`;
+
+/**
+ * And one that answers, writes nothing, and never closes either.
+ *
+ * The case that must not come back as a clean store: the reading is empty
+ * because we stopped watching, not because the shop did nothing (#34).
+ */
+const NEVER_FINISHES_BLANK = `<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Loja muda</title>
+${PADDING}
+</head>
+<body>
+`;
+
 type Shop = {
   pages: Record<string, string>;
   /** Answered for every address, when this shop is one that never 404s. */
   catchAll?: string;
   /** Answered with 403, as a shop that refuses our browser does. */
   refuses?: boolean;
+  /**
+   * Answers the home page with this much, and then never finishes.
+   *
+   * The shape measured on smiles.com.br: a 200 in under a second and a document
+   * that goes on parsing for over a minute. The scan used to wait for
+   * `DOMContentLoaded` as part of navigation and report the shop as probably
+   * offline — the most unfair sentence the product can write, about a store
+   * that answered immediately.
+   *
+   * Only the home page hangs. Everything else 404s at once, so the policy
+   * search does not spend a budget per guessed address.
+   */
+  hangs?: string;
 };
 
 /**
@@ -390,6 +433,10 @@ const SHOPS = {
   },
   /** Answers its home page to every address, policy included. */
   catchAll: { pages: {}, catchAll: CATCH_ALL },
+  /** Answers fast, fires a tracker, and never finishes parsing. */
+  stillParsing: { pages: {}, hangs: NEVER_FINISHES },
+  /** Answers fast, never finishes, and gives us nothing to report. */
+  stillParsingBlank: { pages: {}, hangs: NEVER_FINISHES_BLANK },
 } satisfies Record<string, Shop>;
 
 export type FixtureStore = Record<keyof typeof SHOPS, URL> & {
@@ -399,6 +446,15 @@ export type FixtureStore = Record<keyof typeof SHOPS, URL> & {
 function serve(shop: Shop): Promise<{ server: Server; origin: string }> {
   const server = createServer((request, response) => {
     const path = request.url ?? "/";
+
+    // Answers and stays open. No `end`, so the document never closes and
+    // `DOMContentLoaded` never fires — which is the whole point of this shop.
+    if (shop.hangs !== undefined && path === "/") {
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.write(shop.hangs);
+      return;
+    }
+
     const page = shop.pages[path] ?? shop.catchAll;
 
     response.writeHead(shop.refuses ? 403 : page ? 200 : 404, {

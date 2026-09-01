@@ -22,6 +22,10 @@ const handedOver: PreConsentReading[] = [];
 
 beforeAll(async () => {
   store = await startFixtureStore();
+  // The last two never close their document, so they would each sit out the
+  // whole parse budget. One second exercises the same branch.
+  const IMPATIENT = { parseMs: 1_000 };
+
   const shapes = [
     ["withBanner", store.withBanner],
     ["homemade", store.homemade],
@@ -29,17 +33,20 @@ beforeAll(async () => {
     ["unclickable", store.unclickable],
     ["withoutBanner", store.withoutBanner],
     ["refusing", store.refusing],
+    ["stillParsing", store.stillParsing, IMPATIENT],
+    ["stillParsingBlank", store.stillParsingBlank, IMPATIENT],
   ] as const;
 
   const results = await Promise.all(
-    shapes.map(([name, url]) =>
+    shapes.map(([name, url, patience]) =>
       observeStore(
         url,
         name === "withBanner"
           ? async (reading) => {
               handedOver.push(reading);
             }
-          : undefined
+          : undefined,
+        patience
       )
     )
   );
@@ -266,6 +273,43 @@ describe("what the store says it does", () => {
     expect(scans.withoutBanner).toMatchObject({
       ok: true,
       policy: { state: "not-found" },
+    });
+  });
+});
+
+/**
+ * The shape that used to be reported as a shop that was probably offline.
+ *
+ * Measured on smiles.com.br: a 200 in under a second, `DOMContentLoaded`
+ * seventy-five seconds later, and nine cookies already in the jar at twenty.
+ * The scan waited for the document as part of navigation, so it timed out and
+ * said "a loja não respondeu a tempo" about a store that answered immediately.
+ */
+describe("uma loja que responde rápido e nunca termina de carregar", () => {
+  test("é lida, e não reportada como fora do ar", () => {
+    expect(scans.stillParsing).toMatchObject({ ok: true });
+  });
+
+  test("entrega o rastreador que disparou antes de o documento fechar", () => {
+    expect(names(scans.stillParsing, "pre-consent")).toContain(
+      "fixture_analytics"
+    );
+  });
+
+  test("e o terceiro que ela acionou junto", () => {
+    expect(hosts(scans.stillParsing, "pre-consent")).toContain(
+      "pixel-before.example"
+    );
+  });
+});
+
+describe("e uma que responde, nunca termina, e não mostra nada", () => {
+  test("não volta como loja limpa", () => {
+    // A leitura está vazia porque paramos de olhar, não porque a loja não fez
+    // nada — e essas duas coisas não podem sair iguais na tela (#34).
+    expect(scans.stillParsingBlank).toMatchObject({
+      ok: false,
+      reason: "unfinished",
     });
   });
 });

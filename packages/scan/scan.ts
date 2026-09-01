@@ -90,7 +90,16 @@ export type ScanRejection =
   | TargetRejection
   | "unreachable"
   /** Something answered, and it was not the store. */
-  | "blocked";
+  | "blocked"
+  /**
+   * The store answered and never finished loading, and we saw nothing at all.
+   *
+   * Kept apart from `unreachable` because it is the opposite fact — the store
+   * is up, we ran out of patience — and apart from a clean reading because a
+   * page that was still parsing when we stopped watching cannot support the
+   * sentence "nenhum cookie foi gravado nesta loja" (#34).
+   */
+  | "unfinished";
 
 export type Scan =
   | {
@@ -115,6 +124,35 @@ export type Scan =
 
 /** How long the store gets to answer before the scan gives up on it. */
 const NAVIGATION_TIMEOUT_MS = 20_000;
+
+/**
+ * And how long the document then gets to finish parsing.
+ *
+ * Its own budget, separate from the navigation, because the two are different
+ * questions and conflating them cost us a real store. Measured on
+ * smiles.com.br: the server committed a 200 in under a second and
+ * `DOMContentLoaded` fired seventy-five seconds later, so a scan that waited
+ * for the event as part of navigation timed out and reported "a loja não
+ * respondeu a tempo" about a shop that answered immediately — and whose nine
+ * cookies were already in the jar at twenty seconds, six of them at three.
+ *
+ * Expiring here is not a failure. It means we stopped watching, which is a fact
+ * about us, and the reading is of what fired before that.
+ */
+const PARSE_BUDGET_MS = 12_000;
+
+/**
+ * How patient the scan is with a document that will not finish.
+ *
+ * Overridable for one reason: the fixture tests prove that a store which never
+ * closes its document is read anyway, and waiting twelve real seconds twice
+ * over to prove it adds a minute to a gate that runs on every commit. What is
+ * under test is the behaviour, not the number — a one-second budget exercises
+ * the same branch.
+ *
+ * Production passes nothing and gets the constant above.
+ */
+export type Patience = { parseMs?: number };
 
 /**
  * How long to keep watching after the page reports itself loaded.
@@ -156,32 +194,102 @@ const BANNER_BUDGET_WITH_PLATFORM_MS = 20_000;
  * the challenge's own wording, and the moment to add it is the first time one
  * shows up in the queue, not before.
  */
-async function load(page: Page, url: URL): Promise<{ isStore: boolean }> {
-  // `domcontentloaded`, not `load`: waiting for every image on a shop's home
-  // page buys nothing here. Measured against a real store, both readings
-  // returned the same 27 cookies, because trackers fire long before the last
-  // image lands. On a slow store `load` would blow the timeout and report a
-  // page that rendered fine as unreachable.
+async function load(
+  page: Page,
+  url: URL,
+  parseMs: number
+): Promise<{ isStore: boolean; parsed: boolean }> {
+  // `commit`, which is the moment the response is ours: headers received,
+  // navigation committed, the store has answered. That is the only thing the
+  // navigation timeout should ever be about.
+  //
+  // It used to be `domcontentloaded`, and that made one budget answer two
+  // questions — "did the store answer" and "did its document finish" — so a
+  // shop that answered in under a second and parsed for seventy-five was
+  // reported as a shop that was probably offline.
   const response = await page.goto(url.href, {
-    waitUntil: "domcontentloaded",
+    waitUntil: "commit",
     timeout: NAVIGATION_TIMEOUT_MS,
   });
 
   const status = response?.status() ?? 0;
-  if (status >= 400) return { isStore: false };
+  if (status >= 400) return { isStore: false, parsed: false };
+
+  // Then the document gets its own budget, and is allowed to miss it. Not
+  // `load`: waiting for every image on a shop's home page buys nothing here.
+  // Measured against a real store, both readings returned the same 27 cookies,
+  // because trackers fire long before the last image lands.
+  const parsed = await page
+    .waitForLoadState("domcontentloaded", { timeout: parseMs })
+    .then(() => true)
+    .catch(() => false);
 
   await page.waitForTimeout(SETTLE_MS);
-  return { isStore: true };
+  return { isStore: true, parsed };
+}
+
+/**
+ * How long any one courtesy step may take before we move on without it.
+ *
+ * Used for the picture and for telling the page to stop. Both are things we do
+ * *to* the page rather than measurements of it, and on a document that will not
+ * finish, both queue behind its loading — measured on smiles.com.br, where the
+ * screenshot alone took twenty-three seconds and stopping the page took eleven.
+ * Neither is worth a second of somebody else's scan.
+ */
+const COURTESY_BUDGET_MS = 5_000;
+
+/** Whatever this is, it gets this long, and then we carry on without it. */
+function atMost<T>(work: Promise<T>, ms: number, instead: T): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<T>((resolve) => setTimeout(() => resolve(instead), ms)),
+  ]);
 }
 
 /**
  * The screen as it stands, small enough to keep.
  *
  * The fold, not the whole page: nobody needs a ten-thousand-pixel column to
- * recognise a banner, and every scan keeps two of these.
+ * recognise a banner, and every scan keeps two of these. Budgeted, because a
+ * screenshot waits for a frame that a page still parsing may not deliver — and
+ * a scan without its picture is still a scan.
  */
-const screenshot = (page: Page) =>
-  page.screenshot({ type: "jpeg", quality: 60 }).catch(() => null);
+const screenshot = async (page: Page) => {
+  // The document first, briefly. Navigation now stops at `commit`, so a page we
+  // have just decided about — a 403 served in place of the store, above all —
+  // may not have drawn a pixel yet, and its picture is the only thing that
+  // tells "we were turned away" from "there was nothing to find". Resolves at
+  // once on every path that already waited.
+  await page
+    .waitForLoadState("domcontentloaded", { timeout: COURTESY_BUDGET_MS })
+    .catch(() => {});
+
+  return page
+    .screenshot({ type: "jpeg", quality: 60, timeout: COURTESY_BUDGET_MS })
+    .catch(() => null);
+};
+
+/**
+ * Tells a page that will not finish loading to stop.
+ *
+ * Called only when the parse budget ran out, and it is the honest consequence
+ * of that: we have decided to stop watching, so we stop the watching. Until
+ * this was here, every later step — the picture, the harvest of the policy
+ * link, the banner search — queued behind the document's own loading, and the
+ * banner search took ninety-seven seconds against a budget of twenty. The
+ * budgets were not wrong; nothing was enforcing them.
+ *
+ * What it costs is real: a tracker that would have fired a minute later does
+ * not fire, and does not appear in the reading. That is what a reading with a
+ * deadline means, and the alternative measured at three minutes for one store.
+ */
+const stopLoading = (page: Page) =>
+  atMost(
+    page.evaluate(() => window.stop()).catch(() => {}),
+    COURTESY_BUDGET_MS,
+    undefined
+  );
 
 /** Identity of a cookie across the two readings — a store may reset its value. */
 const cookieKey = (cookie: { name: string; domain: string }) =>
@@ -221,7 +329,8 @@ const observed = (
  */
 export async function observeStore(
   url: URL,
-  onPreConsent?: (reading: PreConsentReading) => Promise<void>
+  onPreConsent?: (reading: PreConsentReading) => Promise<void>,
+  { parseMs = PARSE_BUDGET_MS }: Patience = {}
 ): Promise<Scan> {
   let browser: Browser | undefined;
   try {
@@ -248,7 +357,9 @@ export async function observeStore(
     const reached = new Set<string>();
     page.on("request", (request) => reached.add(request.url()));
 
-    if (!(await load(page, url)).isStore) {
+    const opened = await load(page, url, parseMs);
+
+    if (!opened.isStore) {
       // Not a clean store: a store we did not read. Saying "no cookies were
       // written" about a page that is not the shop would be the most flattering
       // possible way to be wrong.
@@ -259,9 +370,26 @@ export async function observeStore(
       };
     }
 
+    if (!opened.parsed) await stopLoading(page);
+
     const beforeConsent = await context.cookies();
     const beforeHosts = thirdPartyHosts(reached, url);
     const beforeScreen = await screenshot(page);
+
+    // Answered, still parsing when we stopped watching, and nothing to show
+    // for it. Every other outcome here is a fact about the store; this one is a
+    // fact about the scan, and reporting it as an empty reading would hand the
+    // shop the most flattering result the product can produce (#34).
+    //
+    // A partial reading is not this case. Whatever did fire while we watched is
+    // something the browser really observed, and it is reported.
+    if (
+      !opened.parsed &&
+      beforeConsent.length === 0 &&
+      beforeHosts.length === 0
+    ) {
+      return { ok: false, reason: "unfinished", evidence: beforeScreen };
+    }
 
     // Handed over before the banner search, which is the slow part. Whoever is
     // watching gets the pre-consent state at five seconds instead of at
@@ -316,7 +444,7 @@ export async function observeStore(
     // store keeps it, so whatever the banner was holding back fires on an
     // ordinary page view. That is when a consent platform that defers its tags
     // injects them, and the moment a single reload-less reading would miss.
-    await load(page, url);
+    await load(page, url, parseMs);
     const afterConsent = await context.cookies();
     const afterScreen = await screenshot(page);
 

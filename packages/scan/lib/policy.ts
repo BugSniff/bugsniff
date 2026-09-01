@@ -76,6 +76,39 @@ const LONGEST_POLICY = 120_000;
 const POLICY_SETTLE_MS = 2_000;
 
 /**
+ * And how long a policy page gets to finish parsing before we read it anyway.
+ *
+ * Its own budget, separate from the navigation, for the same reason the scan's
+ * own load has one: `domcontentloaded` as the navigation condition makes one
+ * timeout answer two questions, and the slow half poisons the fast one.
+ * Measured on smiles.com.br, whose document parses for over a minute — every
+ * address the search tried burned the full navigation timeout, eight of them in
+ * a row, and a scan that should have taken twenty seconds took a hundred and
+ * eighty. Well past what one invocation may spend (ADR-0002).
+ *
+ * Shorter than the store's own, because this page is only ever read for its
+ * text: a document still parsing yields a short read, a short read is not a
+ * policy, and the search keeps going. It errs towards "we could not read it",
+ * which is the direction this whole module errs in.
+ */
+const POLICY_PARSE_BUDGET_MS = 8_000;
+
+/**
+ * How long the whole search may take, from the first link to the last guess.
+ *
+ * It used to be a budget on the guessing alone, which left the named links and
+ * the hub page unbounded — three page loads at up to thirty seconds each,
+ * before the part that was budgeted even began. Measured on smiles.com.br,
+ * whose document parses for over a minute: the search took forty-two seconds
+ * on its own, inside a scan that took a hundred and eighty, in a function that
+ * is allowed sixty (ADR-0002).
+ *
+ * Running out is not a failure of the store. It is us saying we stopped
+ * looking, which is the sentence this module already knows how to write.
+ */
+const POLICY_BUDGET_MS = 25_000;
+
+/**
  * How long the search may spend trying addresses nobody linked.
  *
  * Every scan is one invocation with a duration to answer for (ADR-0002), and
@@ -202,19 +235,38 @@ async function safeToOpen(
 }
 
 /** Opens an address, if we are allowed to, and lets it finish rendering. */
-async function open(page: Page, href: string): Promise<string | null> {
+async function open(
+  page: Page,
+  href: string,
+  /** What is left of the search's budget. No attempt may outlive it. */
+  left: number
+): Promise<string | null> {
+  if (left <= 0) return null;
+
   const url = await safeToOpen(href, page.url());
   if (!url) return null;
 
   try {
+    // `commit`: the address answered, and that is all the navigation timeout is
+    // about. Whether its document finishes is a separate question with a
+    // separate budget below, and one that is allowed to go unanswered.
     const response = await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: 20_000,
+      waitUntil: "commit",
+      timeout: Math.min(20_000, left),
     });
     if ((response?.status() ?? 0) >= 400) return null;
   } catch {
     return null;
   }
+
+  await page
+    .waitForLoadState("domcontentloaded", {
+      timeout: Math.min(POLICY_PARSE_BUDGET_MS, Math.max(left, 1)),
+    })
+    .catch(() => {
+      // Still parsing. We read what there is; a short read is not a policy and
+      // the search moves on.
+    });
 
   await page.waitForTimeout(POLICY_SETTLE_MS);
   return url;
@@ -311,8 +363,12 @@ type Opened =
   | { state: "unreadable"; url: string };
 
 /** Opens a link that named itself the policy, and reads what came back. */
-async function readNamed(page: Page, href: string): Promise<Opened> {
-  const url = await open(page, href);
+async function readNamed(
+  page: Page,
+  href: string,
+  left: number
+): Promise<Opened> {
+  const url = await open(page, href, left);
   if (!url) return { state: "unreadable", url: href };
 
   // Before `readText`, which strips the page down to its prose.
@@ -348,6 +404,12 @@ export async function readPolicy(
 ): Promise<PolicyReading> {
   const home = page.url();
 
+  // One deadline for the whole search. Every step that loads a page asks how
+  // much is left, so no single attempt can outlive the budget the way three
+  // unbounded ones used to.
+  const deadline = Date.now() + POLICY_BUDGET_MS;
+  const left = () => deadline - Date.now();
+
   // Both collected before anything navigates: the moment we follow the first
   // candidate, the page that held the others is gone.
   const onPage = await findLink(page.mainFrame(), POLICY);
@@ -370,7 +432,7 @@ export async function readPolicy(
 
   for (const href of [fromBanner, onPage]) {
     if (!href) continue;
-    const opened = await readNamed(page, href);
+    const opened = await readNamed(page, href, left());
     if (opened.state === "found" && opened.speaks) {
       return { state: "found", url: opened.url, text: opened.text };
     }
@@ -379,11 +441,11 @@ export async function readPolicy(
 
   // Nothing named a policy, or nothing named one that opened. Follow the page
   // that collects a shop's legal pages and look again from there.
-  const opened = hub ? await open(page, hub) : null;
+  const opened = hub ? await open(page, hub, left()) : null;
   if (opened) {
     const named = await findLink(page.mainFrame(), POLICY);
     if (named) {
-      const opened = await readNamed(page, named);
+      const opened = await readNamed(page, named, left());
       if (opened.state === "found" && opened.speaks) {
         return { state: "found", url: opened.url, text: opened.text };
       }
@@ -406,11 +468,14 @@ export async function readPolicy(
   }
 
   // Nothing on this shop points at its policy. It may still publish one.
-  const deadline = Date.now() + PROBE_BUDGET_MS;
+  //
+  // The guessing gets whatever is left of the search's budget, and no more than
+  // it was ever allowed on its own.
+  const probing = Date.now() + Math.min(PROBE_BUDGET_MS, left());
   for (const path of WELL_KNOWN) {
-    if (Date.now() > deadline) break;
+    if (Date.now() > probing) break;
 
-    const url = await open(page, new URL(path, home).href);
+    const url = await open(page, new URL(path, home).href, left());
     if (!url) continue;
     if (!(await announcesPolicy(page))) continue;
 

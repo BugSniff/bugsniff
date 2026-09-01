@@ -1,5 +1,5 @@
 import { type Browser, type Page } from "playwright-core";
-import { openBrowser } from "./browser";
+import { openBrowser, visitorContext } from "./browser";
 import {
   acceptConsentBanner,
   detectConsentPlatform,
@@ -343,17 +343,9 @@ export async function observeStore(
     browser = await openBrowser();
 
     // A fresh context per scan, so one store never sees another store's
-    // cookies — and so the reading is of this store alone.
-    //
-    // Brazilian store, Brazilian visitor. A context with no options presents
-    // itself as en-US on UTC, and that changes what is being measured: a
-    // consent platform configured for Brazil may not show its banner to that
-    // visitor at all, and a store that serves English to it may not even write
-    // the word the accept control is matched by.
-    const context = await browser.newContext({
-      locale: "pt-BR",
-      timezoneId: "America/Sao_Paulo",
-    });
+    // cookies — and so the reading is of this store alone. How it presents
+    // itself, and why, is in `visitorContext`.
+    const context = await visitorContext(browser);
     const page = await context.newPage();
 
     // Every URL the page reaches for, from the first byte. Requests are the

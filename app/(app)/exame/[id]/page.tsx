@@ -25,6 +25,7 @@ import { Card } from "@/components/ui/card";
 import { scoreOf } from "@/lib/score";
 import { buttonVariants } from "@/components/ui/button";
 import { canonicalHost } from "@/lib/store";
+import { Waiting } from "./waiting";
 import { Watch } from "./watch";
 
 /** Why a scan came back empty-handed, in words the person can act on. */
@@ -73,7 +74,7 @@ export default async function ScanPage({
   const { data: scan } = await supabase
     .from("scans")
     .select(
-      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, policy_text, evidence_pre_path, evidence_post_path, failure, findings"
+      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, policy_text, evidence_pre_path, evidence_post_path, failure, findings, created_at, started_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -164,14 +165,19 @@ export default async function ScanPage({
         </div>
 
         {waiting && (
-          <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
-            {scan.status === "pending"
-              ? "Na fila. Começa assim que uma vaga abrir."
-              : reading
-                ? "Esta é a loja antes de qualquer interação. Agora respondendo ao banner, para ver o que muda depois do consentimento…"
-                : "Abrindo a loja num navegador de verdade…"}{" "}
-            Esta página se atualiza sozinha.
-          </p>
+          <Waiting
+            status={scan.status}
+            // The queue's wait is counted from the request; the reading's from
+            // the moment a slot opened. Two different waits, and saying
+            // "começou há 4 minutos" about a scan that spent them queued would
+            // describe the wrong one.
+            since={
+              (scan.status === "pending"
+                ? scan.created_at
+                : (scan.started_at ?? scan.created_at)) as string | null
+            }
+            reading={reading}
+          />
         )}
 
         {scan.status === "failed" && (

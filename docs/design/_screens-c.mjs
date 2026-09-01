@@ -111,6 +111,7 @@ export const ExameNaFila = screen({
         <div class="col" style="gap: 8px; align-items: center">
           <span style="font-weight: 500">Na fila. Começa assim que uma vaga abrir.</span>
           <p class="sub" style="max-width: 460px">Esta página se atualiza sozinha — pode fechar e voltar depois. Quando o exame terminar, o resultado está aqui.</p>
+          <p class="sub small" style="max-width: 460px">Começa assim que uma vaga abrir. Cada exame na frente leva de 30 segundos a dois minutos.</p>
         </div>
         <div class="col" style="gap: 10px; width: 420px">
           <div class="bar" style="height: 10px; border-radius: 26px"></div>

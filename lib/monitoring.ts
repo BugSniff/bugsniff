@@ -69,11 +69,34 @@ const when = new Intl.DateTimeFormat("pt-BR", {
   year: "numeric",
 });
 
-/** Uma aparição, em uma linha, com a evidência entre parênteses. */
+/** Uma loja que mudou, com o que mudou nela. */
+export type StoreChange = {
+  /** A loja, pelo endereço que é a identidade dela. */
+  host: string;
+  appearances: Appearance[];
+  /** Quando foi a leitura anterior, a que não tinha isto. */
+  previousAt: string;
+  /** Link para o exame que encontrou, no bugsniff. */
+  scanUrl: string;
+};
+
+/** Uma aparição, em uma linha, com a evidência junto. */
 function line({ name, hosts }: Appearance): string {
   return hosts.length > 0
-    ? `- ${name} — sua loja enviou dados para ${hosts.join(", ")}`
-    : `- ${name} — gravou cookie na sua loja`;
+    ? `  - ${name} — a loja enviou dados para ${hosts.join(", ")}`
+    : `  - ${name} — gravou cookie na loja`;
+}
+
+const count = (n: number, one: string, many: string) =>
+  n === 1 ? `1 ${one}` : `${n} ${many}`;
+
+/** O bloco de uma loja dentro do aviso. */
+function block(change: StoreChange): string {
+  return [
+    `${change.host} — ${count(change.appearances.length, "serviço novo", "serviços novos")} desde a leitura de ${when.format(new Date(change.previousAt))}:`,
+    change.appearances.map(line).join("\n"),
+    `  Exame completo: ${change.scanUrl}`,
+  ].join("\n");
 }
 
 /**
@@ -83,42 +106,39 @@ function line({ name, hosts }: Appearance): string {
  * mensagem automática que sai de madrugada sem ninguém ler antes. Um texto que
  * varia entre dois envios sobre o mesmo fato é um texto que ninguém pode
  * conferir depois.
+ *
+ * **Um aviso por organização, nunca um por loja.** Numa agência com quarenta
+ * lojas, quarenta e-mails numa manhã são o mesmo que nenhum — ninguém lê o
+ * trigésimo, e o que se perde é justamente a leitura que importava. O aviso
+ * cobre todas as lojas que mudaram na varredura, e o assunto diz quantas são
+ * antes de a pessoa abrir.
  */
-export function alertMessage({
-  host,
-  appearances,
-  previousAt,
-  scanUrl,
-}: {
-  /** A loja, pelo endereço que é a identidade dela. */
-  host: string;
-  appearances: readonly Appearance[];
-  /** Quando foi a leitura anterior, a que não tinha isto. */
-  previousAt: string;
-  /** Link para o exame que encontrou, no bugsniff. */
-  scanUrl: string;
-}): { subject: string; text: string } {
-  const one = appearances.length === 1;
+export function alertMessage(changes: readonly StoreChange[]): {
+  subject: string;
+  text: string;
+} {
+  const stores = changes.length;
+  const trackers = changes.reduce((n, c) => n + c.appearances.length, 0);
+  const one = changes[0];
 
   return {
-    subject: one
-      ? `${host}: ${appearances[0].name} passou a disparar antes do consentimento`
-      : `${host}: ${appearances.length} rastreadores passaram a disparar antes do consentimento`,
+    subject:
+      stores === 1
+        ? one.appearances.length === 1
+          ? `${one.host}: ${one.appearances[0].name} passou a disparar antes do consentimento`
+          : `${one.host}: ${count(trackers, "rastreador passou", "rastreadores passaram")} a disparar antes do consentimento`
+        : `${count(stores, "loja passou", "lojas passaram")} a acionar rastreadores novos antes do consentimento`,
 
     text: [
-      `O exame automático de ${host} encontrou ${
-        one ? "um serviço" : `${appearances.length} serviços`
-      } que não ${one ? "estava" : "estavam"} na leitura de ${when.format(
-        new Date(previousAt)
-      )}:`,
+      stores === 1
+        ? `O exame automático de ${one.host} encontrou ${count(trackers, "serviço que não estava", "serviços que não estavam")} na leitura anterior:`
+        : `O exame automático desta noite encontrou ${count(trackers, "serviço novo", "serviços novos")} em ${count(stores, "loja", "lojas")}:`,
       "",
-      appearances.map(line).join("\n"),
+      changes.map(block).join("\n\n"),
       "",
-      `${one ? "Ele dispara" : "Eles disparam"} antes de qualquer interação com o banner de consentimento — ou seja, antes de o visitante responder qualquer coisa.`,
+      "Todos disparam antes de qualquer interação com o banner de consentimento — ou seja, antes de o visitante responder qualquer coisa.",
       "",
-      "Não sabemos qual app da sua loja introduziu isso: para saber, o bugsniff precisaria estar conectado à plataforma dela. O que sabemos é o endereço para onde os dados foram, acima.",
-      "",
-      `O exame completo, com as capturas de tela: ${scanUrl}`,
+      "Não sabemos qual app da loja introduziu isso: para saber, o bugsniff precisaria estar conectado à plataforma dela. O que sabemos é o endereço para onde os dados foram, acima.",
     ].join("\n"),
   };
 }

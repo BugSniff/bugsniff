@@ -120,33 +120,71 @@ describe("o que apareceu entre duas leituras", () => {
 });
 
 describe("a mensagem", () => {
-  const mensagem = (appearances: { name: string; hosts: string[] }[]) =>
-    alertMessage({
-      host: "loja.com.br",
-      appearances,
-      previousAt: "2026-08-24T12:00:00Z",
-      scanUrl: "https://bugsniff.com.br/exame/abc",
-    });
+  const change = (
+    host: string,
+    appearances: { name: string; hosts: string[] }[]
+  ) => ({
+    host,
+    appearances,
+    previousAt: "2026-08-24T12:00:00Z",
+    scanUrl: `https://bugsniff.com.br/exame/${host}`,
+  });
 
-  test("nomeia a loja e o serviço no assunto", () => {
-    const { subject } = mensagem([{ name: "Meta Pixel", hosts: [] }]);
+  test("nomeia a loja e o serviço no assunto, quando é uma só", () => {
+    const { subject } = alertMessage([
+      change("loja.com.br", [{ name: "Meta Pixel", hosts: [] }]),
+    ]);
 
     expect(subject).toBe(
       "loja.com.br: Meta Pixel passou a disparar antes do consentimento"
     );
   });
 
-  test("conta, quando é mais de um", () => {
-    const { subject } = mensagem([
-      { name: "Meta Pixel", hosts: [] },
-      { name: "Hotjar", hosts: [] },
+  test("conta, quando é mais de um serviço na mesma loja", () => {
+    const { subject } = alertMessage([
+      change("loja.com.br", [
+        { name: "Meta Pixel", hosts: [] },
+        { name: "Hotjar", hosts: [] },
+      ]),
     ]);
 
     expect(subject).toContain("2 rastreadores");
   });
 
+  /**
+   * O critério do #20, e a razão de o aviso ser adiado até a última leitura da
+   * organização terminar. Quarenta e-mails numa manhã são o mesmo que nenhum:
+   * ninguém lê o trigésimo, e o que se perde é a leitura que importava.
+   */
+  test("uma mensagem só cobre várias lojas, e o assunto diz quantas", () => {
+    const { subject, text } = alertMessage([
+      change("uma.com.br", [{ name: "Meta Pixel", hosts: [] }]),
+      change("outra.com.br", [{ name: "Hotjar", hosts: [] }]),
+      change("terceira.com.br", [{ name: "TikTok", hosts: [] }]),
+    ]);
+
+    expect(subject).toBe(
+      "3 lojas passaram a acionar rastreadores novos antes do consentimento"
+    );
+    expect(text).toContain("uma.com.br");
+    expect(text).toContain("outra.com.br");
+    expect(text).toContain("terceira.com.br");
+  });
+
+  test("cada loja leva o link do exame que encontrou", () => {
+    const { text } = alertMessage([
+      change("uma.com.br", [{ name: "Hotjar", hosts: [] }]),
+      change("outra.com.br", [{ name: "Hotjar", hosts: [] }]),
+    ]);
+
+    expect(text).toContain("https://bugsniff.com.br/exame/uma.com.br");
+    expect(text).toContain("https://bugsniff.com.br/exame/outra.com.br");
+  });
+
   test("diz desde quando não estava lá", () => {
-    const { text } = mensagem([{ name: "Meta Pixel", hosts: [] }]);
+    const { text } = alertMessage([
+      change("loja.com.br", [{ name: "Meta Pixel", hosts: [] }]),
+    ]);
 
     expect(text).toContain("24 de agosto de 2026");
   });
@@ -157,8 +195,10 @@ describe("a mensagem", () => {
    * competência da advocacia, não nossa (ADR-0001).
    */
   test("não conclui nada sobre a loja", () => {
-    const { subject, text } = mensagem([
-      { name: "Meta Pixel", hosts: ["connect.facebook.net"] },
+    const { subject, text } = alertMessage([
+      change("loja.com.br", [
+        { name: "Meta Pixel", hosts: ["connect.facebook.net"] },
+      ]),
     ]);
 
     expect(`${subject}\n${text}`.toLowerCase()).not.toMatch(
@@ -173,17 +213,13 @@ describe("a mensagem", () => {
    * pessoa.
    */
   test("diz que não sabe qual app introduziu, em vez de adivinhar", () => {
-    const { text } = mensagem([
-      { name: "Meta Pixel", hosts: ["connect.facebook.net"] },
+    const { text } = alertMessage([
+      change("loja.com.br", [
+        { name: "Meta Pixel", hosts: ["connect.facebook.net"] },
+      ]),
     ]);
 
-    expect(text).toContain("Não sabemos qual app da sua loja introduziu isso");
+    expect(text).toContain("Não sabemos qual app da loja introduziu isso");
     expect(text).toContain("connect.facebook.net");
-  });
-
-  test("leva o link do exame que encontrou", () => {
-    const { text } = mensagem([{ name: "Hotjar", hosts: [] }]);
-
-    expect(text).toContain("https://bugsniff.com.br/exame/abc");
   });
 });

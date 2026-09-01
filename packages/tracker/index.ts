@@ -72,7 +72,44 @@ export function nameHost(
  * A service seen as a cookie *and* as a request is one service, not two — the
  * Meta Pixel that writes `_fbp` and calls `connect.facebook.net` is the same
  * pixel, and counting it twice would inflate every number the report prints.
+ *
+ * Generic over the row so a caller that selected more columns gets them back.
+ * The consent banner needs exactly that: it derives its blocklist from the
+ * services a reading found, and it cannot block one without the patterns and
+ * the purpose that came on the row.
  */
+export function matchedTrackers<T extends Tracker>(
+  reading: {
+    cookies?: readonly { name: string }[];
+    requests?: readonly { host: string }[];
+  },
+  trackers: readonly T[]
+): T[] {
+  const matched = new Map<string, T>();
+
+  const keep = (tracker: T | undefined) => {
+    if (tracker && !matched.has(tracker.name))
+      matched.set(tracker.name, tracker);
+  };
+
+  for (const cookie of reading.cookies ?? []) {
+    keep(
+      trackers.find(({ cookie_pattern }) =>
+        matches(cookie_pattern, cookie.name)
+      )
+    );
+  }
+
+  for (const request of reading.requests ?? []) {
+    keep(
+      trackers.find(({ host_pattern }) => matches(host_pattern, request.host))
+    );
+  }
+
+  return [...matched.values()];
+}
+
+/** The same reading, reduced to the names a person recognises. */
 export function namedTrackers(
   reading: {
     cookies?: readonly { name: string }[];
@@ -80,17 +117,5 @@ export function namedTrackers(
   },
   trackers: readonly Tracker[]
 ): string[] {
-  const names = new Set<string>();
-
-  for (const cookie of reading.cookies ?? []) {
-    const name = nameCookie(cookie.name, trackers);
-    if (name) names.add(name);
-  }
-
-  for (const request of reading.requests ?? []) {
-    const name = nameHost(request.host, trackers);
-    if (name) names.add(name);
-  }
-
-  return [...names];
+  return matchedTrackers(reading, trackers).map(({ name }) => name);
 }

@@ -71,6 +71,10 @@ _Avoid_: antes/depois, primeira/segunda passada
 Cookie ou requisição de terceiro atribuível a um serviço nomeado, como Meta Pixel ou Google Analytics.
 _Avoid_: pixel, tag, script, cookie
 
+**Finalidade** (`TrackerPurpose`):
+Para que um rastreador está na página, e a única coisa que decide se o banner pode contê-lo: `essential` é o que faz a loja funcionar e nunca é bloqueado, `analytics` mede o visitante, `marketing` é publicidade e perfilamento. Como o nome do rastreador, é um fato sobre o serviço — diz para que ele serve, nunca se ele deveria estar ali.
+_Avoid_: categoria, tipo, classe, gravidade
+
 **Achado** (`Finding`):
 Um fato observado sobre a loja acompanhado da norma que o endereça. Nunca contém conclusão sobre a situação do lojista.
 _Avoid_: problema, erro, alerta, violação, irregularidade, não-conformidade
@@ -94,7 +98,7 @@ O elemento que pede consentimento ao visitante antes de qualquer rastreador disp
 _Avoid_: cookie banner, pop-up, aviso de cookies, modal
 
 **Lista de bloqueio** (`Blocklist`):
-Os rastreadores que o banner impede de disparar enquanto não houver consentimento.
+Os rastreadores que o banner impede de disparar enquanto não houver consentimento. Derivada do exame daquela loja, nunca uma lista genérica, e nunca contém o que a loja precisa para funcionar nem o terceiro que não sabemos nomear.
 _Avoid_: whitelist, filtro, regras
 
 **Pontuação** (`Score`):

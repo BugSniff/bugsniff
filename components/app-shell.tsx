@@ -1,4 +1,8 @@
-import { IconReportAnalytics } from "@tabler/icons-react";
+import {
+  IconCookie,
+  IconListSearch,
+  IconReportAnalytics,
+} from "@tabler/icons-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
@@ -11,13 +15,26 @@ import { createClient } from "@/packages/supabase/server";
 /**
  * The shell of the app: navigation on the left, where you are on top.
  *
- * The navigation offers one destination because the product has one. The
- * canvas draws nine — Exames, Documentos, Banner, Relatórios, Monitoramento,
- * Lojas, Membros, Plano, Conta — and every one of them is a route that does
- * not exist yet; each arrives with the issue that builds it. A menu item that
- * leads nowhere is a promise the screen makes and the product does not keep.
+ * Two lists, because the product has two kinds of destination. This one is the
+ * organization's: it holds every store. The canvas draws more of them —
+ * Relatórios, Monitoramento, Membros, Plano, Conta — and each arrives with the
+ * issue that builds it. A menu item that leads nowhere is a promise the screen
+ * makes and the product does not keep.
  */
 const NAV = [{ href: "/painel", label: "Painel", icon: IconReportAnalytics }];
+
+/**
+ * And this one belongs to whichever store is in view, under the switch.
+ *
+ * The arrangement ADR-0005 describes, and it is what makes "Banner" mean *this
+ * shop's* banner. Whoever has a single store never touches the switch and reads
+ * the sidebar as flat; an agency with forty needs the section to be about the
+ * shop they just picked.
+ */
+const STORE_NAV = [
+  { key: "exames", label: "Exames", icon: IconListSearch, path: "" },
+  { key: "banner", label: "Banner", icon: IconCookie, path: "/banner" },
+];
 
 /** The initials in the corner, from the address, since we have no name yet. */
 const initials = (email: string) => email.slice(0, 2).toUpperCase();
@@ -57,6 +74,7 @@ export async function AppShell({
   return (
     <Frame
       active={active}
+      store={store}
       switcher={<StoreSwitch stores={stores ?? []} current={store} />}
       who={
         <>
@@ -96,6 +114,7 @@ export async function AppShell({
  */
 function Frame({
   active,
+  store,
   switcher,
   who,
   crumbs,
@@ -103,6 +122,8 @@ function Frame({
   children,
 }: {
   active?: string;
+  /** Which store the section under the switch is about, when there is one. */
+  store?: string;
   /** The store switch, or a stand-in while the stores are still coming. */
   switcher: React.ReactNode;
   /** Who is signed in, and the way out. */
@@ -120,23 +141,31 @@ function Frame({
 
         <div className="flex flex-col gap-0.5">
           {NAV.map(({ href, label, icon: Icon }) => (
-            <Link
+            <Item
               key={href}
               href={href}
-              className={cn(
-                "flex h-8 items-center gap-2.5 rounded-4xl px-2.5 text-sm",
-                active === href
-                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground [&_svg]:text-sidebar-primary"
-                  : "[&_svg]:text-muted-foreground"
-              )}
-            >
-              <Icon size={16} stroke={2} />
-              <span>{label}</span>
-            </Link>
+              label={label}
+              icon={Icon}
+              active={active === href}
+            />
           ))}
         </div>
 
         {switcher}
+
+        {store && (
+          <div className="flex flex-col gap-0.5">
+            {STORE_NAV.map(({ key, label, icon: Icon, path }) => (
+              <Item
+                key={key}
+                href={`/loja/${store}${path}`}
+                label={label}
+                icon={Icon}
+                active={active === key}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="mt-auto flex items-center gap-2 border-t p-2.5">
           {who}
@@ -158,6 +187,34 @@ function Frame({
         <div className="flex flex-col gap-5 p-6">{children}</div>
       </div>
     </div>
+  );
+}
+
+/** One row of the sidebar. Two lists draw it, so it lives in one place. */
+function Item({
+  href,
+  label,
+  icon: Icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ size: number; stroke: number }>;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex h-8 items-center gap-2.5 rounded-4xl px-2.5 text-sm",
+        active
+          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground [&_svg]:text-sidebar-primary"
+          : "[&_svg]:text-muted-foreground"
+      )}
+    >
+      <Icon size={16} stroke={2} />
+      <span>{label}</span>
+    </Link>
   );
 }
 

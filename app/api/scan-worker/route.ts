@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { alertOnNewTrackers } from "@/lib/alert";
+import { recordAppearances, sendOrganizationAlert } from "@/lib/alert";
 import { MAX_RUNNING } from "@/lib/queue";
 import { storeEvidence } from "@/packages/evidence";
 import { deriveFindings } from "@/packages/finding";
@@ -71,11 +71,13 @@ async function handOver(origin: string) {
 async function work({ supabase }: Worker, scanId: string, origin: string) {
   const { data: row } = await supabase
     .from("scans")
-    .select("url")
+    .select("url, organization_id")
     .eq("id", scanId)
     .single();
 
   if (!row) return;
+
+  const organizationId = row.organization_id as string | null;
 
   // The pre-consent state, written the moment it exists rather than at the end.
   // The waiting screen listens to this row, so this update is what turns a
@@ -148,9 +150,15 @@ async function work({ supabase }: Worker, scanId: string, origin: string) {
   // result back for it would trade a page that fills in for a page that waits.
   if (scan.ok) {
     await recordFindings({ supabase }, scanId, scan);
-    // Last, and after the reading is already recorded: the alert is about the
-    // scan, so a scan that failed to be announced still happened.
-    await alertOnNewTrackers(supabase, scanId, origin);
+    // Noted on the row, not mailed. The digest goes out once per organization,
+    // from whichever reading turns out to be the last one still running.
+    await recordAppearances(supabase, scanId);
+  }
+
+  // Before handing over, and only if nothing else of this organization is still
+  // in flight: this invocation is the one turning the lights off.
+  if (organizationId) {
+    await sendOrganizationAlert(supabase, organizationId, origin);
   }
 
   await handOver(origin);

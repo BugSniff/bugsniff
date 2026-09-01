@@ -8,6 +8,7 @@ import type {
   PolicyReading,
   ScanRejection,
 } from "@/packages/scan/scan";
+import { EVIDENCE_BUCKET } from "@/packages/evidence";
 import type { Finding } from "@/packages/finding-validator";
 import { registrableDomain } from "@/packages/scan/third-party";
 import {
@@ -101,7 +102,7 @@ export default async function ScanPage({
     path
       ? ((
           await supabase.storage
-            .from("scan-evidence")
+            .from(EVIDENCE_BUCKET)
             .createSignedUrl(path, EVIDENCE_LINK_SECONDS)
         ).data?.signedUrl ?? null)
       : null;

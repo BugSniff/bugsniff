@@ -1,6 +1,7 @@
 import { after } from "next/server";
+import { storeEvidence } from "@/packages/evidence";
 import { deriveFindings } from "@/packages/finding";
-import { runScan, type ConsentPhase } from "@/packages/scan/scan";
+import { runScan } from "@/packages/scan/scan";
 import { createAdminClient } from "@/packages/supabase/admin";
 
 /** A cold start unpacks Chromium before it can open anything. */
@@ -41,34 +42,6 @@ const MAX_RUNNING = 5;
 
 type Worker = { supabase: ReturnType<typeof createAdminClient> };
 
-/** Where screenshots live, guarded by the scan's own rule. */
-const EVIDENCE_BUCKET = "scan-evidence";
-
-/**
- * Files a screenshot under the scan that produced it.
- *
- * Foldered by scan on purpose: the storage policy resolves the folder back to
- * the row, so a picture is readable by exactly the people the reading is.
- */
-async function storeEvidence(
-  { supabase }: Worker,
-  scanId: string,
-  reading: ConsentPhase | "blocked",
-  evidence: Buffer | null
-): Promise<string | null> {
-  if (!evidence) return null;
-
-  const path = `${scanId}/${reading}.jpg`;
-
-  const { error } = await supabase.storage
-    .from(EVIDENCE_BUCKET)
-    .upload(path, evidence, { contentType: "image/jpeg", upsert: true });
-
-  // A scan without its screenshot is still a scan. Losing the picture is not
-  // worth losing the reading it illustrates.
-  return error ? null : path;
-}
-
 /**
  * Runs one scan, records it, then looks for the next one.
  *
@@ -98,7 +71,7 @@ async function work({ supabase }: Worker, scanId: string) {
           cookies,
           requests,
           evidence_pre_path: await storeEvidence(
-            { supabase },
+            supabase,
             scanId,
             "pre-consent",
             evidence
@@ -124,7 +97,7 @@ async function work({ supabase }: Worker, scanId: string) {
             policy_url: "url" in scan.policy ? scan.policy.url : null,
             policy_text: "text" in scan.policy ? scan.policy.text : null,
             evidence_post_path: await storeEvidence(
-              { supabase },
+              supabase,
               scanId,
               "post-consent",
               scan.evidence.postConsent
@@ -138,7 +111,7 @@ async function work({ supabase }: Worker, scanId: string) {
             // that picture is the only way anyone tells "we were turned away"
             // from "there was nothing to find".
             evidence_pre_path: await storeEvidence(
-              { supabase },
+              supabase,
               scanId,
               "blocked",
               scan.evidence ?? null

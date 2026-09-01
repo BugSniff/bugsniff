@@ -4,7 +4,13 @@ import {
   acceptConsentBanner,
   detectConsentPlatform,
 } from "./lib/consent-banner";
-import { findPolicyLink, readPolicy, type PolicyReading } from "./lib/policy";
+import {
+  findPolicyLink,
+  readPolicy,
+  type LinkOutcome,
+  type PolicyReading,
+  type PolicySearch,
+} from "./lib/policy";
 import { thirdPartyHosts } from "./third-party";
 import { parseTargetUrl, type TargetRejection } from "./target-url";
 
@@ -17,7 +23,7 @@ import { parseTargetUrl, type TargetRejection } from "./target-url";
  */
 export type ConsentPhase = "pre-consent" | "post-consent";
 
-export type { PolicyReading };
+export type { LinkOutcome, PolicyReading, PolicySearch };
 
 /**
  * What the scan can honestly say about the banner.

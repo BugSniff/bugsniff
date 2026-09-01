@@ -111,6 +111,10 @@ async function work({ supabase }: Worker, scanId: string) {
             policy_state: scan.policy.state,
             policy_url: "url" in scan.policy ? scan.policy.url : null,
             policy_text: "text" in scan.policy ? scan.policy.text : null,
+            // What the search had in front of it. Kept even when it succeeded:
+            // the links it passed over are as much a part of the reading as the
+            // one it stopped on.
+            policy_survey: scan.policy.survey,
             evidence_post_path: await storeEvidence(
               supabase,
               scanId,

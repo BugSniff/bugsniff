@@ -363,6 +363,16 @@ type Shop = {
   /** Answered with 403, as a shop that refuses our browser does. */
   refuses?: boolean;
   /**
+   * The addresses this shop answers 403 for, while serving everything else.
+   *
+   * Measured on smiles.com.br, and it is the case nobody predicts: the footer
+   * links "Política de privacidade" exactly as it should, the address is right,
+   * and the server behind it — voegol.com.br, the airline whose programme the
+   * shop is — answers "Access Denied" to our browser. The search cannot be
+   * blamed and neither can the shop. Only the report can say what happened.
+   */
+  forbidden?: string[];
+  /**
    * Answers the home page with this much, and then never finishes.
    *
    * The shape measured on smiles.com.br: a 200 in under a second and a document
@@ -433,6 +443,11 @@ const SHOPS = {
   },
   /** Answers its home page to every address, policy included. */
   catchAll: { pages: {}, catchAll: CATCH_ALL },
+  /** Links the policy correctly, at an address that refuses our browser. */
+  policyRefused: {
+    pages: { "/": withFooter(NO_BANNER, POLICY_LINK) },
+    forbidden: ["/politica-de-privacidade"],
+  },
   /** Answers fast, fires a tracker, and never finishes parsing. */
   stillParsing: { pages: {}, hangs: NEVER_FINISHES },
   /** Answers fast, never finishes, and gives us nothing to report. */
@@ -453,6 +468,11 @@ function serve(shop: Shop): Promise<{ server: Server; origin: string }> {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       response.write(shop.hangs);
       return;
+    }
+
+    if (shop.forbidden?.includes(path)) {
+      response.writeHead(403, { "content-type": "text/html; charset=utf-8" });
+      return response.end(REFUSED);
     }
 
     const page = shop.pages[path] ?? shop.catchAll;

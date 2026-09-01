@@ -1,4 +1,6 @@
 import { after } from "next/server";
+import { alertOnNewTrackers } from "@/lib/alert";
+import { MAX_RUNNING } from "@/lib/queue";
 import { storeEvidence } from "@/packages/evidence";
 import { deriveFindings } from "@/packages/finding";
 import { runScan } from "@/packages/scan/scan";
@@ -35,37 +37,38 @@ export const maxDuration = 180;
  */
 export const preferredRegion = "gru1";
 
-/**
- * The most scans allowed to run at once.
- *
- * Not a capacity limit — Vercel would run far more without noticing. It is a
- * spending ceiling: the most we can burn in an hour is the same whether ten or
- * ten thousand people are waiting. Whoever floods the queue lengthens their own
- * wait, not our bill.
- *
- * Read it as a ceiling, not a target. Parallelism comes from people clicking at
- * the same time — each click starts its own chain and each chain takes one slot.
- * A chain runs its scans one after another, so a backlog drains at roughly one
- * scan per ten seconds, not five.
- *
- * ponytail: making a backlog drain five-wide means a worker that calls itself
- * over HTTP to start a sibling invocation, which needs a base URL it does not
- * currently know. Worth it when a backlog is a real thing that happens; today
- * the queue is almost always empty, and draining slower only spends less.
- */
-const MAX_RUNNING = 5;
-
 type Worker = { supabase: ReturnType<typeof createAdminClient> };
+
+/**
+ * Hands the queue to the next invocation, over HTTP rather than in process.
+ *
+ * This is ADR-0002's "uma invocação por loja, nunca um lote numa função só",
+ * and it is the line the chain used to cross. Calling `dispatch()` again inside
+ * the same request kept every scan of the chain in one invocation, spending one
+ * `maxDuration` for all of them — fine for the two scans a person triggers by
+ * hand, fatal for the forty a monitoring run queues at once: the fourth one is
+ * still reading when the function is killed, and the remaining thirty-six never
+ * start.
+ *
+ * The next invocation answers 202 before doing anything, so this costs the
+ * caller a round trip and not a scan.
+ */
+async function handOver(origin: string) {
+  await fetch(`${origin}/api/scan-worker`, { method: "POST" }).catch(() => {
+    // The chain is for speed. Correctness is `requeue_stuck_scans` in the
+    // database and whoever next opens a scan that has not started.
+  });
+}
 
 /**
  * Runs one scan, records it, then looks for the next one.
  *
  * The chain is what keeps the queue moving without polling: the invocation that
- * just finished hands over to the next before it goes. A crash breaks the
- * chain, which is why the sweeper exists — the chain is for speed, the sweeper
- * is for correctness.
+ * just finished hands over to the next before it goes. A crash breaks the chain,
+ * and `requeue_stuck_scans` in the database is what puts the abandoned reading
+ * back — the chain is for speed, the requeue is for correctness.
  */
-async function work({ supabase }: Worker, scanId: string) {
+async function work({ supabase }: Worker, scanId: string, origin: string) {
   const { data: row } = await supabase
     .from("scans")
     .select("url")
@@ -143,9 +146,14 @@ async function work({ supabase }: Worker, scanId: string) {
   // Findings come after the reading is already on screen, not before it.
   // Writing them is a second round trip to a model, and holding the whole
   // result back for it would trade a page that fills in for a page that waits.
-  if (scan.ok) await recordFindings({ supabase }, scanId, scan);
+  if (scan.ok) {
+    await recordFindings({ supabase }, scanId, scan);
+    // Last, and after the reading is already recorded: the alert is about the
+    // scan, so a scan that failed to be announced still happened.
+    await alertOnNewTrackers(supabase, scanId, origin);
+  }
 
-  after(() => dispatch());
+  await handOver(origin);
 }
 
 /**
@@ -185,9 +193,11 @@ async function recordFindings(
 }
 
 /** Takes a slot for the oldest waiting scan, if any slot is free. */
-async function dispatch() {
+async function dispatch(origin: string) {
   const supabase = createAdminClient();
 
+  // Nothing waiting. This is also where a chain ends: the last scan hands over
+  // to an invocation that finds an empty queue and returns.
   const { data: next } = await supabase.rpc("next_pending_scan");
   if (!next) return;
 
@@ -200,16 +210,22 @@ async function dispatch() {
   // slot will pick it up.
   if (!took) return;
 
-  await work({ supabase }, next);
+  await work({ supabase }, next, origin);
 }
 
 /**
  * Answers straight away and does the work afterwards.
  *
- * Whoever kicks the queue — the auth callback, or the sweeper — should not be
- * held open for ten seconds of someone else's browser.
+ * Whoever kicks the queue — the auth callback, the monitoring run, or the
+ * previous link in the chain — should not be held open for ten seconds of
+ * someone else's browser.
+ *
+ * The origin comes off this request rather than out of a variable, so localhost,
+ * every preview deployment and production each hand the queue back to
+ * themselves. A preview that chained into production would run its scans there.
  */
-export async function POST() {
-  after(() => dispatch());
+export async function POST(request: Request) {
+  const { origin } = new URL(request.url);
+  after(() => dispatch(origin));
   return new Response(null, { status: 202 });
 }

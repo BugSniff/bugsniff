@@ -83,6 +83,14 @@ _Avoid_: problema, erro, alerta, violação, irregularidade, não-conformidade
 Dispositivo legal ou orientação de autoridade citado num achado, sempre acompanhado do trecho de origem.
 _Avoid_: lei, regra, requisito, referência
 
+**Monitoramento** (`Monitoring`):
+O reexame periódico de uma loja, sem ninguém pedir. Um exame de monitoramento é um exame como qualquer outro — mesma fila, mesma leitura, mesma tabela — e difere apenas em quem o pediu: ninguém.
+_Avoid_: agendamento, rotina, verificação contínua, watch
+
+**Aviso** (`Alert`):
+A mensagem que sai quando o monitoramento encontra rastreador que a leitura anterior não tinha. Relata a mudança e diz para onde os dados foram; como o achado, não conclui — e, ao contrário dele, não cita norma nenhuma, porque um e-mail automático não é lugar de argumento jurídico.
+_Avoid_: alerta de risco, notificação, aviso de não conformidade
+
 ### O que é produzido
 
 **Controlador** (`Controller`):

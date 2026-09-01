@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { trackersIn, type Exam } from "@/lib/exams";
+import { failureShort, trackersIn, type Exam } from "@/lib/exams";
 import { scoreOf } from "@/lib/score";
 import type { ConsentBannerState, ConsentPhase } from "@/packages/scan/scan";
 import { createClient } from "@/packages/supabase/server";
@@ -60,7 +60,7 @@ export default async function StorePage({
       supabase
         .from("scans")
         .select(
-          "id, url, status, consent_banner, policy_state, policy_text, cookies, requests, created_at, store_id"
+          "id, url, status, consent_banner, policy_state, policy_text, cookies, requests, created_at, store_id, failure"
         )
         .eq("store_id", id)
         .order("created_at", { ascending: false }),
@@ -218,9 +218,20 @@ function ExamRow({ exam, trackers }: { exam: Exam; trackers: Tracker[] }) {
 
       <TableCell className="text-right">
         {failed ? (
-          <Badge variant="destructive">
-            <IconAlertCircle size={12} stroke={2} /> não medido
-          </Badge>
+          // O motivo, e o caminho de abrir mesmo assim: um exame que falhou
+          // guarda a tela que a loja devolveu, e é ela que distingue "fomos
+          // barrados" de "não havia o que encontrar".
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant="destructive">
+              <IconAlertCircle size={12} stroke={2} /> não medido
+            </Badge>
+            <Link
+              href={`/exame/${exam.id}`}
+              className="text-xs text-muted-foreground underline decoration-dotted underline-offset-4"
+            >
+              {failureShort(exam.failure)}
+            </Link>
+          </div>
         ) : (
           <div className="flex justify-end gap-1">
             {done && (

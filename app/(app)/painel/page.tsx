@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  failureShort,
   summarise,
   trackersIn,
   type Exam,
@@ -59,7 +60,7 @@ export default async function PainelPage({
       supabase
         .from("scans")
         .select(
-          "id, url, status, consent_banner, policy_state, cookies, requests, created_at, store_id"
+          "id, url, status, consent_banner, policy_state, cookies, requests, created_at, store_id, failure"
         )
         .order("created_at", { ascending: false })
         .limit(READINGS),
@@ -248,9 +249,17 @@ function StoreRow({
         {done && latest.consent_banner ? (
           <Badge variant="outline">{BANNER[latest.consent_banner]}</Badge>
         ) : failed ? (
-          <Badge variant="destructive">
-            <IconAlertCircle size={12} stroke={2} /> não medido
-          </Badge>
+          // O motivo junto do selo, e não só o selo. Quem abre o painel e vê
+          // uma loja que não mediu precisa saber ali se ela estava fora do ar
+          // ou se ela barrou o nosso navegador — são atendimentos diferentes.
+          <div className="flex flex-col gap-1">
+            <Badge variant="destructive">
+              <IconAlertCircle size={12} stroke={2} /> não medido
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {failureShort(latest.failure)}
+            </span>
+          </div>
         ) : (
           <span className="text-muted-foreground">—</span>
         )}

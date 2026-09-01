@@ -37,6 +37,8 @@ const FAILURES: Record<ScanRejection, string> = {
   unreachable: "A loja não respondeu a tempo. Pode estar fora do ar.",
   blocked:
     "A loja respondeu ao nosso navegador com uma página de erro, não com a loja. Não é um exame limpo: é um exame que não aconteceu.",
+  unfinished:
+    "A loja respondeu, mas o carregamento dela não terminou dentro do tempo do exame, e nosso navegador não chegou a observar nada. Não é loja limpa: é um exame que não aconteceu.",
 };
 
 /** A third party the store talked to. */

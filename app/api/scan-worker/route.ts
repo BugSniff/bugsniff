@@ -4,8 +4,23 @@ import { deriveFindings } from "@/packages/finding";
 import { runScan } from "@/packages/scan/scan";
 import { createAdminClient } from "@/packages/supabase/admin";
 
-/** A cold start unpacks Chromium before it can open anything. */
-export const maxDuration = 60;
+/**
+ * How long one invocation may take, and why it is this much.
+ *
+ * A cold start unpacks Chromium before it can open anything, and then the scan
+ * spends its own budgets: twenty seconds for the store to answer and finish
+ * parsing, twenty for the banner search when a consent platform's trace says
+ * one is coming, twenty-five for the policy search, plus the second reading
+ * after accepting. They add to roughly two minutes for the worst store, which
+ * is measured rather than assumed — smiles.com.br takes ninety-three seconds
+ * and its document parses for over a minute.
+ *
+ * It was 60, which is less than the sum of the budgets the scan declares, so a
+ * slow store was killed mid-reading and left its row in `running` until the
+ * slot expired. ADR-0002 records 300s as available on the plan; this stays well
+ * under it so one pathological store cannot hold a slot for five minutes.
+ */
+export const maxDuration = 180;
 
 /**
  * Where the browser opens the store from. `gru1` is São Paulo.

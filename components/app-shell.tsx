@@ -1,5 +1,6 @@
 import {
   IconCookie,
+  IconFileText,
   IconListSearch,
   IconReportAnalytics,
 } from "@tabler/icons-react";
@@ -33,6 +34,12 @@ const NAV = [{ href: "/painel", label: "Painel", icon: IconReportAnalytics }];
  */
 const STORE_NAV = [
   { key: "exames", label: "Exames", icon: IconListSearch, path: "" },
+  {
+    key: "documentos",
+    label: "Documentos",
+    icon: IconFileText,
+    path: "/documentos",
+  },
   { key: "banner", label: "Banner", icon: IconCookie, path: "/banner" },
 ];
 

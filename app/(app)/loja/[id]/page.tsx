@@ -1,4 +1,4 @@
-import { IconAlertCircle, IconCookie } from "@tabler/icons-react";
+import { IconAlertCircle, IconCookie, IconFileText } from "@tabler/icons-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -100,6 +100,12 @@ export default async function StorePage({
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href={`/loja/${store.id}/documentos`}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            <IconFileText size={14} stroke={2} /> Documentos
+          </Link>
           <Link
             href={`/loja/${store.id}/banner`}
             className={buttonVariants({ variant: "outline" })}

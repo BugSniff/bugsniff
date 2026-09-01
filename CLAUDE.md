@@ -57,6 +57,27 @@ código, e nada é gravado nem exibido sem passar pelo validador
 `GROQ_API_KEY`, e reprova abaixo do piso de nota — é ele que pega a regressão
 de redação que o typecheck não vê.
 
+### Banner de consentimento
+
+O banner gerado é **um arquivo inteiro para colar no tema da loja** — sem script
+hospedado por nós, sem telemetria, sem chamada de volta
+([ADR-0007](./docs/adr/0007-banner-inteiro-na-loja.md)). O runtime mora como
+texto em `packages/consent-banner/lib/runtime.ts`, não como módulo compilado:
+ele é entregue sendo lido, pelo lojista ou pelo desenvolvedor dele.
+
+A lista de bloqueio é **derivada** da leitura mais recente contra a tabela
+`trackers`, nunca gravada. `trackers.purpose` é o que decide o que pode ser
+contido: `essential` nunca é bloqueado, e terceiro que não sabemos nomear nunca
+entra na lista — bloquear um chute quebra a loja de alguém.
+
+Os três botões — aceitar, recusar, escolher — saem sempre iguais, e isso não é
+configurável.
+
+Quem garante tudo isso é `packages/consent-banner/tests/blocking.test.ts`:
+navegador de verdade, loja de teste que dispara rastreador de verdade. Mexeu no
+runtime, é esse teste que diz se ainda funciona — o typecheck não vê nada lá
+dentro.
+
 ### Artefatos visuais
 
 Pedido de artefato, diagrama, página ou mockup vira **arquivo HTML em

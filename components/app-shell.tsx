@@ -3,6 +3,7 @@ import {
   IconFileText,
   IconListSearch,
   IconReportAnalytics,
+  IconUsers,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -18,11 +19,14 @@ import { createClient } from "@/packages/supabase/server";
  *
  * Two lists, because the product has two kinds of destination. This one is the
  * organization's: it holds every store. The canvas draws more of them —
- * Relatórios, Monitoramento, Membros, Plano, Conta — and each arrives with the
- * issue that builds it. A menu item that leads nowhere is a promise the screen
- * makes and the product does not keep.
+ * Relatórios, Monitoramento, Plano, Conta — and each arrives with the issue
+ * that builds it. A menu item that leads nowhere is a promise the screen makes
+ * and the product does not keep.
  */
-const NAV = [{ href: "/painel", label: "Painel", icon: IconReportAnalytics }];
+const NAV = [
+  { href: "/painel", label: "Painel", icon: IconReportAnalytics },
+  { href: "/organizacao", label: "Membros", icon: IconUsers },
+];
 
 /**
  * And this one belongs to whichever store is in view, under the switch.

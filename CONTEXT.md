@@ -21,15 +21,19 @@ A conta que agrupa lojas e membros. Uma agência com quarenta lojas e um lojista
 _Avoid_: conta, cliente, tenant, workspace
 
 **Membro** (`Member`):
-Pessoa com acesso a uma organização.
+Pessoa com acesso a uma organização. Pertence a uma organização só — é o que o produto inteiro assume, e o convite respeita: quem chega convidado não ganha organização própria.
 _Avoid_: usuário
 
 **Proprietário** (`Owner`):
-Membro que criou a organização e o único que pode convidar outros para ela.
+Membro que responde pela organização, e o único que pode repassar esse papel. Existe exatamente um por organização, garantido por índice. Enquanto houver outra pessoa dentro, ele não pode ser excluído sem repassar antes ([ADR-0009](./docs/adr/0009-o-proprietario-nao-sai-sozinho.md)).
 _Avoid_: dono, titular, admin
 
+**Administrador** (`Admin`):
+Membro que convida e remove outros membros, e só isso. Não repassa a propriedade nem leva a organização junto ao sair. A linha entre ele e o proprietário: o administrador mexe em quem entra e quem sai, o proprietário mexe em quem manda.
+_Avoid_: gerente, moderador, gestor
+
 **Convite** (`Invite`):
-Permissão emitida pelo proprietário para que uma pessoa se torne membro da organização. É o único caminho de entrada numa organização que a pessoa não criou.
+Permissão emitida por um proprietário ou administrador para que uma pessoa se torne membro da organização. É o único caminho de entrada numa organização que a pessoa não criou. É entidade própria e não um membro por confirmar: quem foi convidado ainda não tem acesso a nada, e guardá-lo em `members` faria todo controle de acesso do banco depender de um filtro estar certo em toda parte. Vale por prazo e some quando aceito ou revogado.
 _Avoid_: solicitação, liberação, acesso
 
 **Lojista**:

@@ -1,5 +1,7 @@
 import type { Frame, Page } from "playwright-core";
 import { parseTargetUrl } from "../target-url";
+import { registrableDomain } from "../third-party";
+import { mayOpen } from "../robots";
 
 /**
  * Finding what the store says it does.
@@ -321,7 +323,9 @@ export async function findPolicyLink(page: Page): Promise<string | null> {
 /** The address to open, or null if it is one we should not be opening. */
 async function safeToOpen(
   href: string,
-  currentPage: string
+  currentPage: string,
+  /** The store being examined, which is the one that asked to be examined. */
+  home: string
 ): Promise<string | null> {
   let link: URL;
   try {
@@ -330,16 +334,34 @@ async function safeToOpen(
     return null;
   }
 
-  // A link that stays on this origin needs no second opinion: the origin was
-  // cleared before the browser was ever pointed at it.
-  if (link.origin === new URL(currentPage).origin) return link.href;
+  const ours = link.origin === new URL(currentPage).origin;
 
-  // One that leaves it goes through the same guard the pasted URL did, and
-  // here the reason is sharper: a stranger's store can publish
+  // A link that leaves this origin goes through the same guard the pasted URL
+  // did, and here the reason is sharper: a stranger's store can publish
   // `http://169.254.169.254/` and call it "Política de Privacidade", and we
-  // would open it with our own browser and keep whatever came back.
-  const target = await parseTargetUrl(link.href);
-  return target.ok ? target.url.href : null;
+  // would open it with our own browser and keep whatever came back. One that
+  // stays needs no second opinion — the origin was cleared before the browser
+  // was ever pointed at it.
+  if (!ours) {
+    const target = await parseTargetUrl(link.href);
+    if (!target.ok) return null;
+    link = target.url;
+  }
+
+  // And a link that leaves the *shop* asks that host whether we may (ADR-0008).
+  //
+  // Only off the shop's own domain. Its pages are read because its owner asked
+  // us to read them, and a `Disallow` there is addressed to crawlers indexing
+  // the web rather than to the audit that was just requested. The policy
+  // published on a sibling domain is the other case entirely: smiles.com.br
+  // keeps its policy on voegol.com.br, and nobody at voegol asked us for
+  // anything.
+  const shop = registrableDomain(new URL(home).hostname);
+  if (registrableDomain(link.hostname) !== shop && !(await mayOpen(link))) {
+    return null;
+  }
+
+  return link.href;
 }
 
 /** Opens an address, if we are allowed to, and lets it finish rendering. */
@@ -347,11 +369,13 @@ async function open(
   page: Page,
   href: string,
   /** What is left of the search's budget. No attempt may outlive it. */
-  left: number
+  left: number,
+  /** The store being examined, for the question `safeToOpen` asks. */
+  home: string
 ): Promise<string | null> {
   if (left <= 0) return null;
 
-  const url = await safeToOpen(href, page.url());
+  const url = await safeToOpen(href, page.url(), home);
   if (!url) return null;
 
   try {
@@ -474,9 +498,10 @@ type Opened =
 async function readNamed(
   page: Page,
   href: string,
-  left: number
+  left: number,
+  home: string
 ): Promise<Opened> {
-  const url = await open(page, href, left);
+  const url = await open(page, href, left, home);
   if (!url) return { state: "unreadable", url: href };
 
   // Before `readText`, which strips the page down to its prose.
@@ -639,7 +664,7 @@ export async function readPolicy(
     for (const href of [fromBanner, onPage]) {
       if (!href) continue;
 
-      const opened = await readNamed(page, href, left());
+      const opened = await readNamed(page, href, left(), home);
       if (opened.state === "found" && opened.speaks) {
         mark(href, "policy");
         return { state: "found", url: opened.url, text: opened.text };
@@ -659,7 +684,7 @@ export async function readPolicy(
     for (const hub of hubs) {
       if (left() <= 0) break;
 
-      const opened = await open(page, hub, left());
+      const opened = await open(page, hub, left(), home);
       if (!opened) {
         mark(hub, "refused");
         continue;
@@ -669,7 +694,7 @@ export async function readPolicy(
 
       const named = await findLink(page.mainFrame(), POLICY);
       if (named) {
-        const inside = await readNamed(page, named, left());
+        const inside = await readNamed(page, named, left(), home);
         if (inside.state === "found" && inside.speaks) {
           mark(named, "policy");
           return { state: "found", url: inside.url, text: inside.text };
@@ -705,7 +730,7 @@ export async function readPolicy(
     for (const path of WELL_KNOWN) {
       if (Date.now() > probing) break;
 
-      const url = await open(page, new URL(path, home).href, left());
+      const url = await open(page, new URL(path, home).href, left(), home);
       if (!url) continue;
       if (!(await announcesPolicy(page))) continue;
 

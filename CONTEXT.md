@@ -44,6 +44,10 @@ _Avoid_: dono, merchant, seller
 Papel de uma organização que administra lojas de terceiros. Não é entidade separada.
 _Avoid_: parceiro, revendedor, integrador
 
+**Cliente**:
+De quem é a loja, do ponto de vista da agência. É um **rótulo na loja**, não uma entidade: existe para agrupar quarenta lojas em doze linhas no painel, e nada mais. Não tem contato, cobrança nem acesso próprios — no dia em que tiver algum dos três, aí vira entidade e a coluna vira chave. Lojista com uma loja nunca preenche.
+_Avoid_: conta, empresa, contratante, cliente final
+
 **Visitante** (`Visitor`):
 Quem navega na loja auditada e tem dados coletados. É o titular na acepção da LGPD e nunca usa o bugsniff.
 _Avoid_: usuário final, consumidor, cliente

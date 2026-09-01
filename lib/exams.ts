@@ -15,6 +15,8 @@ export type Exam = {
   store_id: string | null;
   /** Why the reading did not happen. Only ever set on a failed scan. */
   failure?: string | null;
+  /** Os achados publicáveis desta leitura. Ausente onde a lista não os pediu. */
+  findings?: unknown[] | null;
 };
 
 /**

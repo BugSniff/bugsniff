@@ -8,7 +8,7 @@ import type { createClient } from "@/packages/supabase/server";
  * says different things depending on how you asked for it.
  */
 export const REPORT_COLUMNS =
-  "id, url, status, created_at, consent_banner, policy_state, policy_url, policy_text, cookies, requests, findings, evidence_pre_path";
+  "id, url, status, created_at, consent_banner, policy_state, policy_url, policy_text, policy_survey, cookies, requests, findings, evidence_pre_path";
 
 /** Where screenshots live, guarded by the scan's own rule. */
 const EVIDENCE_BUCKET = "scan-evidence";

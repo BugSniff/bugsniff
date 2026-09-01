@@ -6,6 +6,7 @@ import type {
   ConsentBannerState,
   ConsentPhase,
   PolicyReading,
+  PolicySearch,
   ScanRejection,
 } from "@/packages/scan/scan";
 import { EVIDENCE_BUCKET } from "@/packages/evidence";
@@ -24,6 +25,7 @@ import { ScoreCard } from "@/components/score-card";
 import { Card } from "@/components/ui/card";
 import { scoreOf } from "@/lib/score";
 import { buttonVariants } from "@/components/ui/button";
+import { OUTCOME, searchSummary } from "@/lib/policy-search";
 import { canonicalHost } from "@/lib/store";
 import { Waiting } from "./waiting";
 import { Watch } from "./watch";
@@ -74,7 +76,7 @@ export default async function ScanPage({
   const { data: scan } = await supabase
     .from("scans")
     .select(
-      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, policy_text, evidence_pre_path, evidence_post_path, failure, findings, created_at, started_at"
+      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, policy_text, policy_survey, evidence_pre_path, evidence_post_path, failure, findings, created_at, started_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -226,7 +228,11 @@ export default async function ScanPage({
               consentBanner={scan.consent_banner}
               trackers={trackers ?? []}
             />
-            <Policy state={scan.policy_state} url={scan.policy_url} />
+            <Policy
+              state={scan.policy_state}
+              url={scan.policy_url}
+              survey={scan.policy_survey as PolicySearch | null}
+            />
             <Timeline
               cookies={cookies}
               beforeShot={beforeShot}
@@ -545,34 +551,94 @@ function BannerNote({
 function Policy({
   state,
   url,
+  survey,
 }: {
   state: PolicyReading["state"] | null;
   url: string | null;
+  /** What the search had in front of it. Absent on readings taken before it. */
+  survey: PolicySearch | null;
 }) {
   if (!state) return null;
 
-  if (state === "found") {
-    return (
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Política de privacidade publicada em{" "}
-        <a href={url ?? "#"} className="underline" rel="nofollow noreferrer">
-          {url}
-        </a>
-        .
-      </p>
-    );
-  }
+  return (
+    <section className="flex flex-col gap-3">
+      {state === "found" ? (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Política de privacidade publicada em{" "}
+          <a href={url ?? "#"} className="underline" rel="nofollow noreferrer">
+            {url}
+          </a>
+          .
+        </p>
+      ) : (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          {state === "unreadable"
+            ? "Encontramos um link para a política de privacidade, mas não conseguimos ler o que ele abre."
+            : "Não encontramos a política de privacidade a partir da home desta loja."}{" "}
+          <span className="text-zinc-500">
+            Isso não quer dizer que ela não exista: quer dizer que o nosso
+            navegador não chegou nela.
+          </span>
+        </p>
+      )}
+
+      <Search survey={survey} />
+    </section>
+  );
+}
+
+/**
+ * What the search had in front of it, and what it did with each link.
+ *
+ * The evidence under the sentence above. "Não chegamos à política" is honest
+ * and unfalsifiable at the same time — nothing on the screen tells a thorough
+ * search from a lazy one — and this is what settles it: how many links the page
+ * carried, which ones touched the subject, and what happened when we followed
+ * them.
+ *
+ * Shown for a reading that found the policy too. The links it passed over are
+ * part of what it did, and a search only shown when it fails is a search
+ * nobody can calibrate.
+ *
+ * A `<details>`, because forty links is the evidence and one sentence is the
+ * argument. It opens with the keyboard and needs no JavaScript.
+ */
+function Search({ survey }: { survey: PolicySearch | null }) {
+  if (!survey) return null;
 
   return (
-    <p className="text-sm text-zinc-600 dark:text-zinc-400">
-      {state === "unreadable"
-        ? "Encontramos um link para a política de privacidade, mas não conseguimos ler o que ele abre."
-        : "Não encontramos a política de privacidade a partir da home desta loja."}{" "}
-      <span className="text-zinc-500">
-        Isso não quer dizer que ela não exista: quer dizer que o nosso navegador
-        não chegou nela.
-      </span>
-    </p>
+    <div className="flex flex-col gap-2 text-xs text-zinc-500">
+      <p>{searchSummary(survey)}</p>
+
+      {survey.candidates.length > 0 && (
+        <details className="group/links">
+          <summary className="w-fit cursor-pointer list-none underline decoration-dotted underline-offset-4 [&::-webkit-details-marker]:hidden">
+            <span className="group-open/links:hidden">
+              Ver os links que olhamos
+            </span>
+            <span className="hidden group-open/links:inline">
+              Esconder os links
+            </span>
+          </summary>
+
+          <ul className="mt-2 flex flex-col gap-2">
+            {survey.candidates.map((candidate) => (
+              <li key={candidate.url} className="flex flex-col">
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  {candidate.text || "(link sem texto)"}{" "}
+                  <span className="text-zinc-500">
+                    — {OUTCOME[candidate.outcome]}
+                  </span>
+                </span>
+                <span className="truncate font-mono text-[11px] text-zinc-400">
+                  {candidate.url}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }
 

@@ -1,3 +1,4 @@
+import { OUTCOME, searchSummary } from "@/lib/policy-search";
 import type { Report } from "@/lib/report";
 
 /**
@@ -72,7 +73,8 @@ export function ReportPaper({
   /** The store's own screen at the first reading, when there is one. */
   banner?: string | null;
 }) {
-  const { store, at, counts, summary, disclosure, findings, score } = report;
+  const { store, at, counts, summary, disclosure, findings, score, search } =
+    report;
 
   return (
     <>
@@ -212,6 +214,45 @@ export function ReportPaper({
                 A imagem mostra a tela que o visitante via enquanto os{" "}
                 {counts.cookies} cookies acima já estavam gravados. Ela não
                 mostra os cookies: cookie é invisível.
+              </p>
+            </div>
+          )}
+
+          {search && (
+            <div className="col" style={{ gap: 10 }}>
+              <h2>A busca pela política</h2>
+              <p className="sub">{searchSummary(search)}</p>
+
+              {search.candidates.length > 0 && (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Link</th>
+                      <th>Endereço</th>
+                      <th>O que aconteceu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {search.candidates.map((candidate) => (
+                      <tr key={candidate.url}>
+                        <td>{candidate.text || "(link sem texto)"}</td>
+                        <td className="dim mono small">{candidate.url}</td>
+                        <td className="dim">{OUTCOME[candidate.outcome]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {/* The paragraph that makes the table mean something. Without it
+                  a reader takes a page with no policy as a shop that hides one,
+                  and the commonest reason by far is neither. */}
+              <p className="sub small">
+                Esta lista é o que o nosso navegador tinha diante de si na
+                página da loja. Ela está aqui para que a frase acima possa ser
+                conferida: link que não abre para nós não é link que não existe,
+                e política que não alcançamos não é política que não foi
+                publicada.
               </p>
             </div>
           )}

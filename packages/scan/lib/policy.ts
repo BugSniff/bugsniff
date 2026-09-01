@@ -30,8 +30,58 @@ const POLICY_HREF =
  * that files its policy in a hub is not a shop without a policy, and reporting
  * it as one would put a false fact in somebody's report.
  */
-const HUB_TEXT = /pol[íi]ticas|privacidade|lgpd|termos|central\s+de\s+ajuda/i;
-const HUB_HREF = /politicas|privacidade|privacy|lgpd|termos/i;
+const HUB_TEXT =
+  /pol[íi]ticas|privacidade|lgpd|termos|central\s+de\s+ajuda|pol[íi]tica\s+de\s+cookies|aviso\s+de\s+cookies/i;
+const HUB_HREF =
+  /politicas|privacidade|privacy|lgpd|termos|politica-de-cookies/i;
+
+/**
+ * Anything on the page that might lead somewhere legal, however loosely.
+ *
+ * Deliberately wider than either pattern above, because it is not used to
+ * decide anything: it is used to *record* what the search had in front of it.
+ * A shop where we found nothing deserves a report that shows what we looked at
+ * — "não encontramos" is a statement about us, and this is what makes it
+ * checkable by the person reading it.
+ */
+const LEGAL_LINK =
+  /privac|cookie|pol[íi]tic|lgpd|termo|legal|dados\s+pessoais|prote[çc][ãa]o\s+de\s+dados|compliance/i;
+
+/** What became of a link the search had in front of it. */
+export type LinkOutcome =
+  /** Opened, read, and it is the policy this reading reports. */
+  | "policy"
+  /** Opened as a collection of legal pages, and searched from there. */
+  | "hub"
+  /** We asked and were refused: an error status, or an address we may not open. */
+  | "refused"
+  /** Opened, and what came back was not the policy. */
+  | "not-policy"
+  /** Never opened. A better candidate answered first, or the budget ran out. */
+  | "not-followed";
+
+/**
+ * What the search had in front of it, and what it did with each of them.
+ *
+ * The evidence behind the sentence the report prints. "Nosso navegador não
+ * chegou à política" is honest but unfalsifiable on its own; with this, the
+ * person reading can see how many links the page carried, which ones we judged
+ * relevant, and what happened when we followed them — including the case that
+ * turns up more than anyone expects, which is a policy page that answers 403 to
+ * our browser.
+ */
+export type PolicySearch = {
+  /** Every link the store's page carried, counted. */
+  seen: number;
+  /** The ones whose label or address touched the vocabulary above. */
+  candidates: { text: string; url: string; outcome: LinkOutcome }[];
+};
+
+/** Enough to show the search was thorough, few enough to be read. */
+const MOST_CANDIDATES = 40;
+
+/** How many pages of legal links the search may open before giving up. */
+const MOST_HUBS = 3;
 
 /**
  * Where a shop's policy lives when nothing on the page points at it.
@@ -119,7 +169,7 @@ const POLICY_BUDGET_MS = 25_000;
  */
 const PROBE_BUDGET_MS = 15_000;
 
-export type PolicyReading =
+type Reading =
   | { state: "found"; url: string; text: string }
   /**
    * We searched and did not find one.
@@ -131,6 +181,9 @@ export type PolicyReading =
   | { state: "not-found" }
   /** The link is there and what it opens is not text we can read. */
   | { state: "unreadable"; url: string };
+
+/** The reading, with the search that produced it attached. */
+export type PolicyReading = Reading & { survey: PolicySearch };
 
 type LinkPattern = { text: RegExp; href: RegExp };
 
@@ -187,6 +240,61 @@ async function findLink(
       { text: pattern.text.source, href: pattern.href.source }
     )
     .catch(() => null);
+}
+
+/**
+ * The same search, but keeping more than the first answer.
+ *
+ * A page that collects a shop's legal documents is rarely the only one linked:
+ * "Termos de Uso", "Políticas", "Política de Cookies" sit side by side in the
+ * same footer, and the policy hides behind whichever of them the shop chose.
+ * Taking only the first spends the shop's one chance on an arbitrary pick.
+ */
+async function findLinks(
+  frame: Frame,
+  pattern: LinkPattern,
+  most: number
+): Promise<string[]> {
+  return frame
+    .evaluate(
+      ({ text, href, most }) => {
+        const byText = new RegExp(text, "i");
+        const byHref = new RegExp(href, "i");
+
+        const links: HTMLAnchorElement[] = [];
+        const collect = (root: Document | ShadowRoot) => {
+          links.push(...root.querySelectorAll<HTMLAnchorElement>("a[href]"));
+          root
+            .querySelectorAll("*")
+            .forEach(
+              (element) => element.shadowRoot && collect(element.shadowRoot)
+            );
+        };
+        collect(document);
+
+        const label = (link: HTMLAnchorElement) =>
+          (
+            link.innerText ||
+            link.textContent ||
+            link.getAttribute("aria-label") ||
+            link.getAttribute("title") ||
+            ""
+          )
+            .replace(/\s+/g, " ")
+            .trim();
+
+        // Same order as the single-answer search: what the link says beats
+        // where it points, so every text match comes before any href match.
+        const named = links.filter((link) => byText.test(label(link)));
+        const pointed = links.filter((link) => byHref.test(link.href));
+
+        return [
+          ...new Set([...named, ...pointed].map((link) => link.href)),
+        ].slice(0, most);
+      },
+      { text: pattern.text.source, href: pattern.href.source, most }
+    )
+    .catch(() => []);
 }
 
 /**
@@ -398,6 +506,80 @@ async function readNamed(
  * `fromBanner` is the link harvested by `findPolicyLink` before the banner was
  * answered — see there for why it cannot be found from here.
  */
+/**
+ * Every link on the page, and which of them could lead somewhere legal.
+ *
+ * Counted, not judged. The number is the point: a report that says we found no
+ * policy is worth exactly as much as the evidence that we looked, and "olhamos
+ * os 275 links desta página, 7 tinham a ver com o assunto" is that evidence.
+ *
+ * Shadow roots included, for the same reason as the search itself: a consent
+ * platform keeps its links in one.
+ */
+async function surveyLinks(
+  frame: Frame
+): Promise<{ seen: number; candidates: { text: string; url: string }[] }> {
+  return frame
+    .evaluate(
+      ({ source, most }) => {
+        const legal = new RegExp(source, "i");
+
+        const links: HTMLAnchorElement[] = [];
+        const collect = (root: Document | ShadowRoot) => {
+          links.push(...root.querySelectorAll<HTMLAnchorElement>("a[href]"));
+          root
+            .querySelectorAll("*")
+            .forEach(
+              (element) => element.shadowRoot && collect(element.shadowRoot)
+            );
+        };
+        collect(document);
+
+        const seen = new Map<string, string>();
+
+        for (const link of links) {
+          const text = (
+            link.innerText ||
+            link.textContent ||
+            link.getAttribute("aria-label") ||
+            link.getAttribute("title") ||
+            ""
+          )
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 90);
+
+          // The same document linked twice from a page is one candidate.
+          if (!legal.test(text + " " + link.href)) continue;
+          if (!seen.has(link.href)) seen.set(link.href, text);
+        }
+
+        return {
+          seen: links.length,
+          candidates: [...seen]
+            .slice(0, most)
+            .map(([url, text]) => ({ text, url })),
+        };
+      },
+      { source: LEGAL_LINK.source, most: MOST_CANDIDATES }
+    )
+    .catch(() => ({ seen: 0, candidates: [] }));
+}
+
+/**
+ * Reads the policy the store publishes, searching for it where it hides.
+ *
+ * Called last, after every reading has been captured: it navigates away from
+ * the store, and anything measured after this point would be measuring the
+ * policy page instead of the shop.
+ *
+ * The order is what makes it a search rather than a lookup: what the banner
+ * linked before we answered it, what the page links by name, what the pages
+ * that collect a shop's legal documents lead to, and — last — the handful of
+ * addresses where a Brazilian shop's policy actually lives. Everything it did
+ * is recorded on the way, because the sentence this can end on is "we did not
+ * find one", and that sentence needs to be checkable.
+ */
 export async function readPolicy(
   page: Page,
   fromBanner?: string | null
@@ -410,47 +592,93 @@ export async function readPolicy(
   const deadline = Date.now() + POLICY_BUDGET_MS;
   const left = () => deadline - Date.now();
 
-  // Both collected before anything navigates: the moment we follow the first
-  // candidate, the page that held the others is gone.
-  const onPage = await findLink(page.mainFrame(), POLICY);
-  const hub = await findLink(page.mainFrame(), HUB);
+  // Harvested first, while we are still standing on the store's own page.
+  const survey = await surveyLinks(page.mainFrame());
 
-  // Two things worth keeping while the search goes on, neither good enough to
-  // stop it. A link that named itself and then failed to open: "the store links
-  // a policy we could not read" is not "we found nothing". And a page that
-  // opened, is long enough, and never says it is the policy — which is how the
-  // cookie page behind "Privacidade e Cookies" gets filed as one. Both are
-  // reported only if nothing better turns up, so keeping looking costs a
-  // reading nothing and can only trade up.
-  let unreadable: PolicyReading | null = null;
-  let weak: PolicyReading | null = null;
-
-  const keep = (opened: Opened) => {
-    if (opened.state === "unreadable") unreadable ??= opened;
-    else weak ??= { state: "found", url: opened.url, text: opened.text };
+  // What happened to each address we had in front of us. Absent means we never
+  // opened it, which is its own honest answer and the default below.
+  const outcomes = new Map<string, LinkOutcome>();
+  const mark = (url: string | null | undefined, outcome: LinkOutcome) => {
+    if (url) outcomes.set(url, outcome);
   };
 
-  for (const href of [fromBanner, onPage]) {
-    if (!href) continue;
-    const opened = await readNamed(page, href, left());
-    if (opened.state === "found" && opened.speaks) {
-      return { state: "found", url: opened.url, text: opened.text };
-    }
-    keep(opened);
-  }
+  const reading = await search();
 
-  // Nothing named a policy, or nothing named one that opened. Follow the page
-  // that collects a shop's legal pages and look again from there.
-  const opened = hub ? await open(page, hub, left()) : null;
-  if (opened) {
-    const named = await findLink(page.mainFrame(), POLICY);
-    if (named) {
-      const opened = await readNamed(page, named, left());
+  return {
+    ...reading,
+    survey: {
+      seen: survey.seen,
+      candidates: survey.candidates.map((candidate) => ({
+        ...candidate,
+        outcome: outcomes.get(candidate.url) ?? "not-followed",
+      })),
+    },
+  };
+
+  async function search(): Promise<Reading> {
+    // Both collected before anything navigates: the moment we follow the first
+    // candidate, the page that held the others is gone.
+    const onPage = await findLink(page.mainFrame(), POLICY);
+    const hubs = await findLinks(page.mainFrame(), HUB, MOST_HUBS);
+
+    // Two things worth keeping while the search goes on, neither good enough to
+    // stop it. A link that named itself and then failed to open: "the store
+    // links a policy we could not read" is not "we found nothing". And a page
+    // that opened, is long enough, and never says it is the policy — which is
+    // how the cookie page behind "Privacidade e Cookies" gets filed as one.
+    // Both are reported only if nothing better turns up, so keeping looking
+    // costs a reading nothing and can only trade up.
+    let unreadable: Reading | null = null;
+    let weak: Reading | null = null;
+
+    const keep = (opened: Opened) => {
+      if (opened.state === "unreadable") unreadable ??= opened;
+      else weak ??= { state: "found", url: opened.url, text: opened.text };
+    };
+
+    for (const href of [fromBanner, onPage]) {
+      if (!href) continue;
+
+      const opened = await readNamed(page, href, left());
       if (opened.state === "found" && opened.speaks) {
+        mark(href, "policy");
         return { state: "found", url: opened.url, text: opened.text };
       }
+
+      mark(href, opened.state === "unreadable" ? "refused" : "not-policy");
       keep(opened);
-    } else {
+    }
+
+    // Nothing named a policy, or nothing named one that opened. Follow the
+    // pages that collect a shop's legal documents and look again from there.
+    //
+    // More than one of them, because the first is not always the right one: a
+    // footer that lists "Termos de Uso" before "Política de Cookies" would have
+    // spent the shop's only chance on the terms, and the policy is often one
+    // click behind the cookie page rather than behind the terms.
+    for (const hub of hubs) {
+      if (left() <= 0) break;
+
+      const opened = await open(page, hub, left());
+      if (!opened) {
+        mark(hub, "refused");
+        continue;
+      }
+
+      mark(hub, "hub");
+
+      const named = await findLink(page.mainFrame(), POLICY);
+      if (named) {
+        const inside = await readNamed(page, named, left());
+        if (inside.state === "found" && inside.speaks) {
+          mark(named, "policy");
+          return { state: "found", url: inside.url, text: inside.text };
+        }
+        mark(named, inside.state === "unreadable" ? "refused" : "not-policy");
+        keep(inside);
+        continue;
+      }
+
       // Some shops link the policy once, from the footer, as plain
       // "Privacidade" — a word that names a subject, not a document. That link
       // *is* the policy, so what we just opened has to identify itself.
@@ -461,29 +689,32 @@ export async function readPolicy(
       const announces = await announcesPolicy(page);
       const text = await readText(page);
       if (looksLikePolicy(text)) {
-        if (announces) return { state: "found", url: opened, text };
+        if (announces) {
+          mark(hub, "policy");
+          return { state: "found", url: opened, text };
+        }
         weak ??= { state: "found", url: opened, text };
       }
     }
+
+    // Nothing on this shop points at its policy. It may still publish one.
+    //
+    // The guessing gets whatever is left of the search's budget, and no more
+    // than it was ever allowed on its own.
+    const probing = Date.now() + Math.min(PROBE_BUDGET_MS, left());
+    for (const path of WELL_KNOWN) {
+      if (Date.now() > probing) break;
+
+      const url = await open(page, new URL(path, home).href, left());
+      if (!url) continue;
+      if (!(await announcesPolicy(page))) continue;
+
+      const text = await readText(page);
+      if (looksLikePolicy(text)) return { state: "found", url, text };
+    }
+
+    // Nothing announced itself. A page we opened and could read still beats
+    // telling somebody we found nothing.
+    return weak ?? unreadable ?? { state: "not-found" };
   }
-
-  // Nothing on this shop points at its policy. It may still publish one.
-  //
-  // The guessing gets whatever is left of the search's budget, and no more than
-  // it was ever allowed on its own.
-  const probing = Date.now() + Math.min(PROBE_BUDGET_MS, left());
-  for (const path of WELL_KNOWN) {
-    if (Date.now() > probing) break;
-
-    const url = await open(page, new URL(path, home).href, left());
-    if (!url) continue;
-    if (!(await announcesPolicy(page))) continue;
-
-    const text = await readText(page);
-    if (looksLikePolicy(text)) return { state: "found", url, text };
-  }
-
-  // Nothing announced itself. A page we opened and could read still beats
-  // telling somebody we found nothing.
-  return weak ?? unreadable ?? { state: "not-found" };
 }

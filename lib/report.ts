@@ -1,6 +1,10 @@
 import { observe, type Reading } from "@/packages/finding";
 import type { Finding } from "@/packages/finding-validator";
-import type { ConsentBannerState, ConsentPhase } from "@/packages/scan/scan";
+import type {
+  ConsentBannerState,
+  ConsentPhase,
+  PolicySearch,
+} from "@/packages/scan/scan";
 import { scoreOf, type Score } from "@/lib/score";
 import { namedTrackers, type Tracker } from "@/packages/tracker";
 
@@ -20,6 +24,8 @@ export type Reported = {
   policy_state: string | null;
   policy_url: string | null;
   policy_text: string | null;
+  /** Absent on readings taken before the search recorded itself. */
+  policy_survey?: PolicySearch | null;
   cookies: { name: string; phase?: ConsentPhase }[] | null;
   requests: { host: string; phase?: ConsentPhase }[] | null;
   findings: Finding[] | null;
@@ -36,6 +42,14 @@ export type Report = {
   summary: string;
   /** What the store's own policy does and does not name. */
   disclosure: string | null;
+  /**
+   * What the search for that policy had in front of it.
+   *
+   * On the paper for the same reason it is on the screen: the report can end on
+   * "não chegamos à política desta loja", and a reader has no way to tell that
+   * from "não procuramos" unless the search shows its work.
+   */
+  search: PolicySearch | null;
   /** Only findings the validator approved ever reach here (ADR-0001). */
   findings: Finding[];
   /** The one place in the product that concludes, and it is on the paper too. */
@@ -144,6 +158,7 @@ export function reportOf(scan: Reported, trackers: readonly Tracker[]): Report {
     counts,
     summary: summarise(counts, names, scan.consent_banner),
     disclosure: disclosure(scan, names, trackers),
+    search: scan.policy_survey ?? null,
     findings: scan.findings ?? [],
     score: scoreOf(scan, trackers),
   };

@@ -24,6 +24,7 @@ beforeAll(async () => {
     "unlinked",
     "catchAll",
     "cookiesFirst",
+    "policyRefused",
   ] as const;
 
   const results = await Promise.all(
@@ -105,5 +106,56 @@ describe("a loja que responde 200 para qualquer endereço", () => {
       ok: true,
       policy: { state: "not-found" },
     });
+  });
+});
+
+/** O que a busca registrou, para a leitura poder ser conferida. */
+const survey = (scan: Scan) => (scan.ok ? scan.policy.survey : null);
+
+const outcomeOf = (scan: Scan, matching: RegExp) =>
+  survey(scan)?.candidates.find((c) => matching.test(c.url))?.outcome;
+
+describe("a loja cuja política está no lugar certo e recusa o navegador", () => {
+  test("não vira loja sem política: vira política que não abriu", () => {
+    // Medido no smiles.com.br. O link estava no rodapé, escrito por extenso, e
+    // o servidor do outro lado respondeu 403.
+    expect(scans.policyRefused).toMatchObject({
+      ok: true,
+      policy: { state: "unreadable" },
+    });
+  });
+
+  test("e a busca registra que foi esse link que recusou", () => {
+    expect(outcomeOf(scans.policyRefused, /politica-de-privacidade/)).toBe(
+      "refused"
+    );
+  });
+});
+
+describe("o que a busca registra sobre si mesma", () => {
+  test("conta os links da página, achando ou não a política", () => {
+    // Também quando encontrou: os links que ela passou por cima fazem parte do
+    // que ela fez, e busca que só aparece quando falha é busca que ninguém
+    // consegue calibrar.
+    expect(survey(scans.onlyPrivacidade)?.seen).toBeGreaterThan(0);
+    expect(outcomeOf(scans.onlyPrivacidade, /privacidade/)).toBe("policy");
+  });
+
+  test("mostra a página de cookies como caminho, nunca como a política", () => {
+    // A política de cookies não é a política de privacidade, e continua não
+    // sendo. O que mudou é que agora ela é seguida como um caminho até a
+    // política, que é o que ela costuma ser.
+    expect(outcomeOf(scans.cookiesFirst, /cookies/)).toBe("hub");
+    expect(scans.cookiesFirst).toMatchObject({
+      ok: true,
+      policy: {
+        state: "found",
+        url: expect.stringContaining("politica-de-privacidade"),
+      },
+    });
+  });
+
+  test("não inventa candidato numa loja que não linka nada", () => {
+    expect(survey(scans.unlinked)?.candidates).toEqual([]);
   });
 });

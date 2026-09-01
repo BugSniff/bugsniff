@@ -1,0 +1,17 @@
+-- O que a busca pela política tinha na frente, e o que ela fez com cada link.
+--
+-- The report can already end on "nosso navegador não chegou à política desta
+-- loja", and that sentence is honest but unfalsifiable: nothing on the screen
+-- lets the reader tell a thorough search from a lazy one. This is the evidence
+-- behind it — how many links the page carried, which ones touched the subject,
+-- and what happened when we followed them.
+--
+-- It matters most in the case nobody expects. Measured on smiles.com.br: the
+-- search found the right link on the first try — "Política de privacidade",
+-- pointing at voegol.com.br, the airline whose programme the shop is — and that
+-- server answered 403 to our browser. Without this column the report says we
+-- did not reach the policy, and every reader assumes we did not look.
+--
+-- Shaped after the same rule as the rest of this table: a fact our own browser
+-- observed, written by the server, never asserted by a visitor.
+alter table public.scans add column policy_survey jsonb;

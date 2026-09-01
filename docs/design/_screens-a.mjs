@@ -332,9 +332,15 @@ export const ExameEsperando = screen({
           <span style="color: var(--sidebar-primary); margin-top: 2px">${icon("scan", 18)}</span>
           <div class="col" style="gap: 4px">
             <span style="font-weight: 500">Esta é a loja antes de qualquer interação.</span>
-            <span class="sub">Agora respondendo ao banner, para ver o que muda depois do consentimento. Esta página se atualiza sozinha.</span>
+            <span class="sub">Agora respondendo ao banner, para ver o que muda depois do consentimento. Esta página se atualiza sozinha — pode fechar e voltar depois.</span>
           </div>
         </div>
+        <div class="col" style="gap: 10px; padding-top: 4px">
+          <span class="row small" style="gap: 10px; align-items: center; color: var(--muted-foreground)">${icon("check", 15)} Fila</span>
+          <span class="row small" style="gap: 10px; align-items: center; font-weight: 500"><span style="width: 8px; height: 8px; margin: 0 3px; border-radius: 999px; background: var(--sidebar-primary)"></span> Antes do consentimento</span>
+          <span class="row small" style="gap: 10px; align-items: center; color: color-mix(in oklab, var(--muted-foreground) 70%, transparent)"><span style="width: 6px; height: 6px; margin: 0 4px; border-radius: 999px; border: 1px solid currentColor"></span> Depois do consentimento, e a política</span>
+        </div>
+        <p class="sub small" style="max-width: 520px">Costuma levar de 30 segundos a um minuto. Loja pesada pode passar de dois minutos, e o exame para sozinho em três.</p>
       </div>
 
       <div class="card flush">

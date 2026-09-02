@@ -7,7 +7,6 @@ import type {
   ConsentPhase,
   PolicyReading,
   PolicySearch,
-  ScanRejection,
 } from "@/packages/scan/scan";
 import { EVIDENCE_BUCKET } from "@/packages/evidence";
 import type { Finding } from "@/packages/finding-validator";
@@ -25,24 +24,11 @@ import { ScoreCard } from "@/components/score-card";
 import { Card } from "@/components/ui/card";
 import { scoreOf } from "@/lib/score";
 import { buttonVariants } from "@/components/ui/button";
+import { failureMessage } from "@/lib/exams";
 import { OUTCOME, searchSummary } from "@/lib/policy-search";
 import { canonicalHost } from "@/lib/store";
 import { Waiting } from "./waiting";
 import { Watch } from "./watch";
-
-/** Why a scan came back empty-handed, in words the person can act on. */
-const FAILURES: Record<ScanRejection, string> = {
-  malformed: "O endereço não pôde ser lido.",
-  "unsupported-scheme": "Só examinamos endereços http e https.",
-  "unsupported-port": "Só examinamos endereços nas portas padrão.",
-  unresolvable: "Não encontramos esse endereço.",
-  "private-address": "Esse endereço não é público.",
-  unreachable: "A loja não respondeu a tempo. Pode estar fora do ar.",
-  blocked:
-    "A loja respondeu ao nosso navegador com uma página de erro, não com a loja. Não é um exame limpo: é um exame que não aconteceu.",
-  unfinished:
-    "A loja respondeu, mas o carregamento dela não terminou dentro do tempo do exame, e nosso navegador não chegou a observar nada. Não é loja limpa: é um exame que não aconteceu.",
-};
 
 /** A third party the store talked to. */
 type Request = { host: string; phase: ConsentPhase };
@@ -76,7 +62,7 @@ export default async function ScanPage({
   const { data: scan } = await supabase
     .from("scans")
     .select(
-      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, policy_text, policy_survey, evidence_pre_path, evidence_post_path, failure, findings, created_at, started_at"
+      "id, url, status, cookies, requests, consent_banner, consent_platform, policy_state, policy_url, policy_text, policy_survey, evidence_pre_path, evidence_post_path, failure, findings, created_at, started_at, monitored"
     )
     .eq("id", id)
     .maybeSingle();
@@ -164,6 +150,13 @@ export default async function ScanPage({
             {canonicalHost(scan.url)}
           </h1>
           <p className="mt-1 text-sm text-zinc-500">{scan.url}</p>
+          {/* Quem não pediu esta leitura precisa saber por que ela existe: sem
+              isto, um exame que ninguém lembra de ter feito parece engano. */}
+          {scan.monitored && (
+            <p className="mt-1 text-xs text-zinc-500">
+              Exame automático, do monitoramento semanal desta loja.
+            </p>
+          )}
         </div>
 
         {waiting && (
@@ -185,8 +178,7 @@ export default async function ScanPage({
         {scan.status === "failed" && (
           <>
             <p role="alert" className="text-sm text-red-600">
-              {FAILURES[scan.failure as ScanRejection] ??
-                "O exame não pôde ser concluído."}
+              {failureMessage(scan.failure)}
             </p>
             {beforeShot && (
               <Shot

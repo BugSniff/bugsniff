@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/monitor",
+      "schedule": "11 6 * * *"
+    },
+    {
       "path": "/api/evidence-sweeper",
       "schedule": "23 5 * * *"
     }

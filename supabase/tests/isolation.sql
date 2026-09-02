@@ -21,6 +21,8 @@ declare
   b uuid := gen_random_uuid();
   org_a uuid;
   org_b uuid;
+  store_a uuid;
+  store_b uuid;
   visible int;
 begin
   -- Two signups. The organization is not created here on purpose: the trigger
@@ -38,10 +40,20 @@ begin
     raise exception 'both signups landed in the same organization';
   end if;
 
+  -- One store each, because a reading that belongs to an organization belongs
+  -- to one of its stores: `scans_store_with_organization` says so, and this test
+  -- silently stopped running the day that constraint arrived (#49). Nothing runs
+  -- these files on a schedule, which is exactly how a proof rots unnoticed.
+  insert into public.stores (organization_id, host) values (org_a, 'loja-a.example')
+  returning id into store_a;
+  insert into public.stores (organization_id, host) values (org_b, 'loja-b.example')
+  returning id into store_b;
+
   -- One scan for each organization, plus an anonymous one belonging to nobody:
-  -- the shape the table actually holds once people scan before signing up.
-  insert into public.scans (organization_id, url) values (org_a, 'https://loja-a.example');
-  insert into public.scans (organization_id, url) values (org_b, 'https://loja-b.example');
+  -- the shape the table actually holds once people scan before signing up. The
+  -- anonymous one has no store either, which is the pair the constraint allows.
+  insert into public.scans (organization_id, store_id, url) values (org_a, store_a, 'https://loja-a.example');
+  insert into public.scans (organization_id, store_id, url) values (org_b, store_b, 'https://loja-b.example');
   insert into public.scans (organization_id, url) values (null, 'https://anonimo.example');
 
   -- From here on we are A, seen through RLS exactly as a request from the app.
@@ -100,8 +112,16 @@ begin
   -- write one, anyone could record that any store carried any cookie, and the
   -- findings built on scans later would inherit that.
   begin
-    insert into public.scans (organization_id, url) values (org_a, 'https://forjado.example');
+    insert into public.scans (organization_id, store_id, url) values (org_a, store_a, 'https://forjado.example');
     raise exception 'A could record a scan';
+  exception when insufficient_privilege then null;
+  end;
+
+  -- Nor a store. A store is what our own server recorded from a reading, not
+  -- something a visitor asserts.
+  begin
+    insert into public.stores (organization_id, host) values (org_a, 'forjada.example');
+    raise exception 'A could record a store';
   exception when insufficient_privilege then null;
   end;
 

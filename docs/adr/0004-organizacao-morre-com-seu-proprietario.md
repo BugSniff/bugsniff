@@ -1,4 +1,10 @@
+---
+status: amended
+---
+
 # A organização morre com seu proprietário
+
+> Emendado pelo [ADR-0009](./0009-o-proprietario-nao-sai-sozinho.md): continua valendo para o proprietário **sozinho**. Com outra pessoa dentro, excluí-lo passou a ser recusado — pelo banco, e não pela UI como o `Consequences` abaixo previa.
 
 Quem cria a conta cria a organização e nasce proprietário dela. Excluir o proprietário exclui a organização, e a organização leva os membros restantes por cascade. Membro comum sai sozinho e a organização segue de pé.
 
@@ -14,4 +20,4 @@ Cascade por chave estrangeira, com uma coluna `owner_id` em `organizations`, foi
 
 Enquanto uma organização for uma pessoa, isso está correto. Quando houver convite e organização com vários membros, **passa a ser perigoso**: excluir o proprietário derrubaria calado uma conta com lojas de terceiros dentro. A partir daí, excluir um proprietário tem de exigir que ele repasse o papel a outro membro antes — regra de produto, na UI, não no banco. O trigger carrega um comentário `ponytail:` nomeando esse teto.
 
-A garantia é verificada por `supabase/tests/organization-lifecycle.sql`, que cobre os dois lados: membro comum saindo não derruba a organização, proprietário saindo derruba.
+A garantia é verificada por `supabase/tests/organization-lifecycle.sql`, que cobre os dois lados: membro comum saindo não derruba a organização, proprietário saindo derruba. O caso do proprietário acompanhado está em `supabase/tests/invites-and-ownership.sql`.

@@ -21,15 +21,19 @@ A conta que agrupa lojas e membros. Uma agência com quarenta lojas e um lojista
 _Avoid_: conta, cliente, tenant, workspace
 
 **Membro** (`Member`):
-Pessoa com acesso a uma organização.
+Pessoa com acesso a uma organização. Pertence a uma organização só — é o que o produto inteiro assume, e o convite respeita: quem chega convidado não ganha organização própria.
 _Avoid_: usuário
 
 **Proprietário** (`Owner`):
-Membro que criou a organização e o único que pode convidar outros para ela.
+Membro que responde pela organização, e o único que pode repassar esse papel. Existe exatamente um por organização, garantido por índice. Enquanto houver outra pessoa dentro, ele não pode ser excluído sem repassar antes ([ADR-0009](./docs/adr/0009-o-proprietario-nao-sai-sozinho.md)).
 _Avoid_: dono, titular, admin
 
+**Administrador** (`Admin`):
+Membro que convida e remove outros membros, e só isso. Não repassa a propriedade nem leva a organização junto ao sair. A linha entre ele e o proprietário: o administrador mexe em quem entra e quem sai, o proprietário mexe em quem manda.
+_Avoid_: gerente, moderador, gestor
+
 **Convite** (`Invite`):
-Permissão emitida pelo proprietário para que uma pessoa se torne membro da organização. É o único caminho de entrada numa organização que a pessoa não criou.
+Permissão emitida por um proprietário ou administrador para que uma pessoa se torne membro da organização. É o único caminho de entrada numa organização que a pessoa não criou. É entidade própria e não um membro por confirmar: quem foi convidado ainda não tem acesso a nada, e guardá-lo em `members` faria todo controle de acesso do banco depender de um filtro estar certo em toda parte. Vale por prazo e some quando aceito ou revogado.
 _Avoid_: solicitação, liberação, acesso
 
 **Lojista**:
@@ -39,6 +43,10 @@ _Avoid_: dono, merchant, seller
 **Agência**:
 Papel de uma organização que administra lojas de terceiros. Não é entidade separada.
 _Avoid_: parceiro, revendedor, integrador
+
+**Cliente**:
+De quem é a loja, do ponto de vista da agência. É um **rótulo na loja**, não uma entidade: existe para agrupar quarenta lojas em doze linhas no painel, e nada mais. Não tem contato, cobrança nem acesso próprios — no dia em que tiver algum dos três, aí vira entidade e a coluna vira chave. Lojista com uma loja nunca preenche.
+_Avoid_: conta, empresa, contratante, cliente final
 
 **Visitante** (`Visitor`):
 Quem navega na loja auditada e tem dados coletados. É o titular na acepção da LGPD e nunca usa o bugsniff.
@@ -82,6 +90,14 @@ _Avoid_: problema, erro, alerta, violação, irregularidade, não-conformidade
 **Norma** (`Norm`):
 Dispositivo legal ou orientação de autoridade citado num achado, sempre acompanhado do trecho de origem.
 _Avoid_: lei, regra, requisito, referência
+
+**Monitoramento** (`Monitoring`):
+O reexame periódico de uma loja, sem ninguém pedir. Um exame de monitoramento é um exame como qualquer outro — mesma fila, mesma leitura, mesma tabela — e difere apenas em quem o pediu: ninguém.
+_Avoid_: agendamento, rotina, verificação contínua, watch
+
+**Aviso** (`Alert`):
+A mensagem que sai quando o monitoramento encontra rastreador que a leitura anterior não tinha. Relata a mudança e diz para onde os dados foram; como o achado, não conclui — e, ao contrário dele, não cita norma nenhuma, porque um e-mail automático não é lugar de argumento jurídico.
+_Avoid_: alerta de risco, notificação, aviso de não conformidade
 
 ### O que é produzido
 

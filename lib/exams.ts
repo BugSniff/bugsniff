@@ -13,7 +13,53 @@ export type Exam = {
   requests: { host: string; phase?: ConsentPhase }[] | null;
   created_at: string;
   store_id: string | null;
+  /** Why the reading did not happen. Only ever set on a failed scan. */
+  failure?: string | null;
+  /** Os achados publicáveis desta leitura. Ausente onde a lista não os pediu. */
+  findings?: unknown[] | null;
 };
+
+/**
+ * Por que um exame não aconteceu, na frase que a pessoa pode usar.
+ *
+ * Um só lugar, porque a mesma leitura falhada aparece em três telas — o exame,
+ * a loja e o painel — e "não medido" sem motivo é a versão da falha que ninguém
+ * consegue atender. Quem abre o painel e vê uma loja que não mediu precisa
+ * saber, ali, se a loja estava fora do ar ou se ela nos barrou.
+ *
+ * Chaves de texto e não do tipo `ScanRejection`: a fila também escreve aqui
+ * (`abandoned`, de `requeue_stuck_scans`), e essa não é uma recusa da loja — é
+ * uma invocação nossa que morreu. Um `Record` fechado obrigaria a fingir que os
+ * dois vêm do mesmo lugar.
+ */
+const FAILURES: Record<string, string> = {
+  malformed: "O endereço não pôde ser lido.",
+  "unsupported-scheme": "Só examinamos endereços http e https.",
+  "unsupported-port": "Só examinamos endereços nas portas padrão.",
+  unresolvable: "Não encontramos esse endereço.",
+  "private-address": "Esse endereço não é público.",
+  unreachable: "A loja não respondeu a tempo. Pode estar fora do ar.",
+  blocked:
+    "A loja respondeu ao nosso navegador com uma página de erro, não com a loja. Não é um exame limpo: é um exame que não aconteceu.",
+  unfinished:
+    "A loja respondeu, mas o carregamento dela não terminou dentro do tempo do exame, e nosso navegador não chegou a observar nada. Não é loja limpa: é um exame que não aconteceu.",
+  abandoned:
+    "O exame começou e a execução dele foi interrompida antes de terminar. Não é uma resposta da loja: é uma falha nossa, e ele foi tentado de novo até desistirmos.",
+};
+
+/** A frase inteira. */
+export const failureMessage = (failure: string | null | undefined): string =>
+  FAILURES[failure ?? ""] ?? "O exame não pôde ser concluído.";
+
+/**
+ * A mesma coisa em meia linha, para caber numa célula de tabela.
+ *
+ * A primeira oração da frase inteira. Deliberadamente derivado e não uma
+ * segunda lista: duas redações do mesmo motivo divergem no dia em que alguém
+ * corrige uma delas.
+ */
+export const failureShort = (failure: string | null | undefined): string =>
+  failureMessage(failure).split(". ")[0].replace(/\.$/, "");
 
 /** A store, with what its readings add up to. */
 export type StoreSummary = {

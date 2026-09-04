@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
@@ -26,6 +25,7 @@ import { scoreOf } from "@/lib/score";
 import { buttonVariants } from "@/components/ui/button";
 import { failureMessage } from "@/lib/exams";
 import { OUTCOME, searchSummary } from "@/lib/policy-search";
+import { requestOrigin } from "@/lib/origin";
 import { canonicalHost } from "@/lib/store";
 import { Waiting } from "./waiting";
 import { Watch } from "./watch";
@@ -78,8 +78,13 @@ export default async function ScanPage({
   // sweeping for orphans on a schedule, the person looking at a scan that has
   // not started nudges the queue themselves — which is exactly when it matters
   // and never when it does not. A scan nobody is waiting for can wait.
+  //
+  // The origin comes from `requestOrigin` and not from the `Origin` header,
+  // which a page render does not carry: this fetch used to be built against the
+  // string "null" on every single visit, throw, and be swallowed by the catch
+  // below. The sweeper had never once swept.
   if (scan.status === "pending") {
-    const origin = (await headers()).get("origin");
+    const origin = await requestOrigin();
     after(() =>
       fetch(`${origin}/api/scan-worker`, { method: "POST" }).catch(() => {
         // Another visit will try again.

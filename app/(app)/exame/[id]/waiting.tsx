@@ -16,11 +16,13 @@ import { cn } from "@/lib/utils";
  * and a half. Nothing said what was happening, nothing said how long, and an
  * empty page that says nothing is indistinguishable from one that has broken.
  *
- * Three things carry that weight here, and none of them is decoration. A clock
+ * Four things carry that weight here, and none of them is decoration. A clock
  * that moves, because a number ticking is most of what tells somebody the page
  * is alive. A list of steps with the current one marked, because "what is it
- * doing" has a real answer we happen to know. And a stated expectation of how
- * long, which is the one the product had been keeping to itself.
+ * doing" has a real answer we happen to know. A bar of the clock against the
+ * ceiling, so the wait has an end somebody can see and not just read. And a
+ * stated expectation of how long, which is the one the product had been
+ * keeping to itself.
  */
 
 /**
@@ -33,6 +35,15 @@ import { cn } from "@/lib/utils";
  * but the point at which the scan stops whether or not it is done.
  */
 const SLOW_AFTER_SECONDS = 75;
+
+/**
+ * When the scan stops whether or not it is done.
+ *
+ * `maxDuration` on the worker, and therefore the one honest end of the bar:
+ * not an estimate of when the reading will finish, but the moment after which
+ * it will not be running at all.
+ */
+const CEILING_SECONDS = 180;
 
 /**
  * The steps, in the order they happen.
@@ -163,6 +174,39 @@ export function Waiting({
           ))}
         </ol>
 
+        {/* Time, not progress.
+
+            A bar of how much of the reading is done would be a bar we cannot
+            observe — there is no such number to read. This one is the clock
+            against the invocation's own ceiling, which is a real quantity, and
+            the caption says so rather than letting the shape imply otherwise.
+            The steps above are the actual progress, and they stay. */}
+        {now && since && (
+          <div className="flex flex-col gap-1.5">
+            <div
+              role="progressbar"
+              aria-label="Tempo decorrido do exame"
+              aria-valuemin={0}
+              aria-valuemax={CEILING_SECONDS}
+              aria-valuenow={Math.min(Math.round(seconds), CEILING_SECONDS)}
+              className="h-1.5 overflow-hidden rounded-4xl bg-foreground/10"
+            >
+              <div
+                className="h-full rounded-4xl bg-primary transition-[width] duration-1000 ease-linear"
+                style={{
+                  width: `${Math.min(100, (seconds / CEILING_SECONDS) * 100)}%`,
+                }}
+              />
+            </div>
+            <div className="flex justify-between gap-4 text-xs text-muted-foreground">
+              <span className="tabular-nums">
+                {elapsed(since, now)} decorridos
+              </span>
+              <span>para sozinho em 3min</span>
+            </div>
+          </div>
+        )}
+
         {/* The sentence the product had been keeping to itself. Both halves are
             measured: the range is what the queue actually does, and the three
             minutes is the invocation's own ceiling, not a guess. */}
@@ -170,8 +214,8 @@ export function Waiting({
           {status === "pending"
             ? "Começa assim que uma vaga abrir. Cada exame na frente leva de 30 segundos a dois minutos."
             : slow
-              ? "Esta loja está levando mais que a média — costuma acontecer com loja pesada, que continua carregando por um minuto ou mais. O exame segue, e para sozinho em três minutos."
-              : "Costuma levar de 30 segundos a um minuto. Loja pesada pode passar de dois minutos, e o exame para sozinho em três."}
+              ? "Esta loja está levando mais que a média — costuma acontecer com loja pesada, que continua carregando por um minuto ou mais. O exame segue."
+              : "A barra é o tempo, não o progresso: ela anda com o relógio até o teto acima, porque quanto falta é justamente o que não sabemos. Costuma terminar em menos de um minuto."}
         </p>
       </Card>
 
@@ -188,30 +232,35 @@ export function Waiting({
  *
  * Not a spinner and not filler: the page currently jumps from one line of text
  * to a full report, and reserving the shape is what keeps the arrival from
- * shoving everything the person was reading off the screen.
+ * shoving everything the person was reading off the screen. Which means the
+ * shape has to be the real one — the score's board of numbers, and the grid of
+ * cards under it, at the height the cards actually come in at.
  */
 function Coming() {
   return (
-    <div className="flex flex-col gap-4" aria-hidden>
-      <Card className="gap-4 px-6">
-        <Skeleton className="h-10 w-28" />
+    <div className="flex flex-col gap-8" aria-hidden>
+      <Card className="px-6">
+        <div className="flex gap-9">
+          <Skeleton className="h-[76px] w-40" />
+          <Skeleton className="h-[76px] w-24" />
+          <Skeleton className="h-[76px] w-24" />
+        </div>
         <div className="flex flex-col gap-2.5">
           <Skeleton className="h-3 w-full max-w-md" />
           <Skeleton className="h-3 w-full max-w-sm" />
-          <Skeleton className="h-3 w-full max-w-xs" />
         </div>
       </Card>
 
-      <Card className="gap-3 px-6">
-        <Skeleton className="h-3 w-40" />
-        {[0, 1, 2, 3].map((row) => (
-          <div key={row} className="flex gap-3">
-            <Skeleton className="h-3 flex-1" />
+      <div className="grid gap-4 md:grid-cols-2 md:[grid-auto-rows:minmax(20rem,1fr)]">
+        {[0, 1, 2, 3].map((card) => (
+          <Card key={card} size="sm" className="h-full gap-3 px-5">
+            <Skeleton className="h-9 w-20" />
+            <Skeleton className="h-3.5 w-full max-w-[260px]" />
+            <Skeleton className="flex-1 w-full" />
             <Skeleton className="h-3 w-28" />
-            <Skeleton className="h-3 w-20" />
-          </div>
+          </Card>
         ))}
-      </Card>
+      </div>
     </div>
   );
 }

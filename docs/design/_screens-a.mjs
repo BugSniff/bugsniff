@@ -1,5 +1,5 @@
 // Entrada pública e o caminho do exame.
-import { artboard, screen, icon } from "./_parts.mjs";
+import { artboard, screen, icon, waiting } from "./_parts.mjs";
 
 const S = { store: "casadobolo.com.br" };
 
@@ -313,35 +313,19 @@ export const Exames = screen({
       <p class="sub small">Um exame guarda os prints por 7 dias. Depois disso a leitura continua, a imagem não.</p>`,
 });
 
+/**
+ * A espera depois que a primeira leitura chegou.
+ *
+ * O esqueleto sai de cena aqui: existe leitura de verdade para mostrar, e um
+ * esqueleto ao lado do dado de que ele é esqueleto seria fingir esperar por
+ * algo que já chegou. Falta só o momento de cada cookie, que só o segundo
+ * estado resolve.
+ */
 export const ExameEsperando = screen({
   active: "exames",
   store: S.store,
   crumbs: `casadobolo.com.br <span>/</span> Exames <span>/</span> <strong>31 ago, 14h02</strong>`,
-  page: `      <div class="page-head">
-        <div class="col" style="gap: 6px">
-          <h1 class="mono" style="font-size: 20px">casadobolo.com.br</h1>
-          <div class="row" style="gap: 8px; align-items: center">
-            <span class="tag"><span style="width: 6px; height: 6px; border-radius: 999px; background: var(--sidebar-primary)"></span> lendo</span>
-            <span class="sub small">começou há 6 segundos</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card sm" style="gap: 10px; background: color-mix(in oklab, var(--primary) 12%, var(--card))">
-        <div class="row" style="gap: 10px; align-items: flex-start">
-          <span style="color: var(--sidebar-primary); margin-top: 2px">${icon("scan", 18)}</span>
-          <div class="col" style="gap: 4px">
-            <span style="font-weight: 500">Esta é a loja antes de qualquer interação.</span>
-            <span class="sub">Agora respondendo ao banner, para ver o que muda depois do consentimento. Esta página se atualiza sozinha — pode fechar e voltar depois.</span>
-          </div>
-        </div>
-        <div class="col" style="gap: 10px; padding-top: 4px">
-          <span class="row small" style="gap: 10px; align-items: center; color: var(--muted-foreground)">${icon("check", 15)} Fila</span>
-          <span class="row small" style="gap: 10px; align-items: center; font-weight: 500"><span style="width: 8px; height: 8px; margin: 0 3px; border-radius: 999px; background: var(--sidebar-primary)"></span> Antes do consentimento</span>
-          <span class="row small" style="gap: 10px; align-items: center; color: color-mix(in oklab, var(--muted-foreground) 70%, transparent)"><span style="width: 6px; height: 6px; margin: 0 4px; border-radius: 999px; border: 1px solid currentColor"></span> Depois do consentimento, e a política</span>
-        </div>
-        <p class="sub small" style="max-width: 520px">Costuma levar de 30 segundos a um minuto. Loja pesada pode passar de dois minutos, e o exame para sozinho em três.</p>
-      </div>
+  page: `${waiting({ at: 1, clock: "1 min 6 s", seconds: 66 })}
 
       <div class="card flush">
         <div class="card-head">
@@ -512,3 +496,301 @@ export const Achados = screen({
         <a class="btn outline sm" href="#" style="margin-left: auto">Ver o que foi recusado</a>
       </div>`,
 });
+
+/* ------------------------------------------- a nota, ponto por ponto */
+
+/**
+ * Um ponto da norma como card: a nota dele em cima, o que a leitura achou, e a
+ * evidência que sustenta isso.
+ *
+ * A nota vem primeiro e vem grande porque é o que a pessoa procura na tela. Ela
+ * não é colorida pelo valor — o destaque é o tamanho, e nunca a cor, que
+ * concluiria o que o texto se recusa a concluir (ADR-0005).
+ *
+ * `state` são as mesmas três marcas que a nota já tinha: ponto cheio, ponto que
+ * faltou, e ponto que esta leitura não conseguiu medir. Só o que faltou ganha
+ * âmbar, porque é onde está a ação — e ponto não medido não pode parecer ponto
+ * perdido pela loja.
+ */
+const point = ({
+  label,
+  earned,
+  weight,
+  detail,
+  norm,
+  evidence = "",
+  state = "full",
+}) => `          <div class="point${state === "full" ? "" : ` ${state}`}">
+            <div class="between" style="align-items: flex-start">
+              <span class="pts${state === "unmeasured" ? " none" : ""}">${state === "unmeasured" ? "não medido" : `${earned}<em>/${weight}</em>`}</span>
+              <span class="point-mark">${icon(state === "full" ? "circle-check" : state === "gap" ? "circle-x" : "circle-dashed", 18)}</span>
+            </div>
+            <div class="col" style="gap: 4px">
+              <span class="point-label">${label}</span>
+              <p class="sub small">${detail}</p>
+            </div>
+${evidence ? `${evidence}\n` : `            <span style="flex: 1"></span>\n`}            <p class="norm">${norm}</p>
+          </div>`;
+
+/** A evidência que é um trecho: o que foi citado, e de onde. */
+const cited = (caption, text) => `            <figure class="evidence">
+              <figcaption>${caption}</figcaption>
+              <blockquote>${text}</blockquote>
+            </figure>`;
+
+/** A evidência que é uma lista de nomes. */
+const names = (rows) => `            <figure class="evidence">
+${rows
+  .map(
+    ([
+      caption,
+      items,
+      kind,
+    ]) => `              <figcaption>${caption}</figcaption>
+              <div class="chips">${items.map((n) => `<span class="tag${kind ? ` ${kind}` : ""}">${n}</span>`).join("")}</div>`
+  )
+  .join("\n")}
+            </figure>`;
+
+const FAZ = [
+  point({
+    state: "gap",
+    label: "Rastreadores só depois do consentimento",
+    earned: 9,
+    weight: 30,
+    detail:
+      "7 de 10 rastreadores nomeados dispararam antes de qualquer interação com o banner.",
+    evidence: names([
+      [
+        "Dispararam antes do consentimento",
+        [
+          "Meta Pixel",
+          "Hotjar",
+          "Google Analytics",
+          "Google Ads",
+          "Criteo",
+          "TikTok",
+          "Google DoubleClick",
+        ],
+        "pre",
+      ],
+      ["Esperaram o aceite", ["Reddit", "Klaviyo", "RD Station"]],
+    ]),
+    norm: "LGPD, art. 7º, I e art. 8º",
+  }),
+  point({
+    label: "Banner de consentimento",
+    earned: 15,
+    weight: 15,
+    detail:
+      "Nosso navegador encontrou o banner desta loja e conseguiu aceitá-lo, o que é o que permitiu ler os dois estados.",
+    evidence: cited(
+      "Evidência",
+      "O print da loja com o banner na tela está guardado com este exame — dá para conferir o que o navegador respondeu."
+    ),
+    norm: "LGPD, art. 8º",
+  }),
+];
+
+const DECLARA = [
+  point({
+    label: "Política de privacidade publicada",
+    earned: 10,
+    weight: 10,
+    detail: "A política foi localizada a partir da loja e lida por inteiro.",
+    evidence: `            <figure class="evidence">
+              <figcaption>Onde está publicada</figcaption>
+              <blockquote>
+                <a class="mono" href="#" style="font-size: 12px; text-decoration: underline; color: var(--foreground)">https://casadobolo.com.br/politicas/privacidade</a>
+                <span class="col" style="padding-top: 6px">18.286 caracteres lidos e guardados com este exame.</span>
+              </blockquote>
+            </figure>`,
+    norm: "LGPD, art. 9º",
+  }),
+  point({
+    state: "gap",
+    label: "A política nomeia o que a loja usa",
+    earned: 6,
+    weight: 15,
+    detail: "A política nomeia 4 dos 10 rastreadores observados.",
+    evidence: names([
+      [
+        "Nomeados na política",
+        ["Google Analytics", "Google Ads", "Meta Pixel", "Reddit"],
+      ],
+      [
+        "Observados e não nomeados",
+        [
+          "Hotjar",
+          "Criteo",
+          "TikTok",
+          "Google DoubleClick",
+          "Klaviyo",
+          "RD Station",
+        ],
+        "pre",
+      ],
+    ]),
+    norm: "LGPD, art. 9º, V e art. 6º, VI",
+  }),
+  point({
+    label: "A política diz como revogar o consentimento",
+    earned: 7,
+    weight: 7,
+    detail: "O texto da política cobre este ponto.",
+    evidence: cited(
+      "Trecho da política",
+      "“…O usuário poderá, a qualquer momento, <mark>revogar</mark> o consentimento fornecido, por meio do canal de atendimento indicado nesta política, sem prejuízo da licitude do tratamento realizado até então.”"
+    ),
+    norm: "LGPD, art. 8º, §5º",
+  }),
+  point({
+    label: "A política identifica o controlador",
+    earned: 6,
+    weight: 6,
+    detail: "O texto da política cobre este ponto.",
+    evidence: cited(
+      "Trecho da política",
+      "“…A Casa do Bolo Comércio de Alimentos Ltda., <mark>inscrita no CNPJ</mark> sob o nº <mark>12.345.678/0001-90</mark>, com sede na Rua das Palmeiras, 220, São Paulo/SP, é a controladora dos dados pessoais tratados nesta loja.”"
+    ),
+    norm: "LGPD, art. 9º, III",
+  }),
+  point({
+    label: "A política dá um canal de contato",
+    earned: 6,
+    weight: 6,
+    detail: "O texto da política cobre este ponto.",
+    evidence: cited(
+      "Trecho da política",
+      "“…Em caso de dúvidas sobre esta política ou sobre o tratamento dos seus dados pessoais, entre em contato pelo e-mail <mark>privacidade@casadobolo.com.br</mark>.”"
+    ),
+    norm: "LGPD, art. 9º, IV",
+  }),
+  point({
+    label: "A política lista os direitos do titular",
+    earned: 7,
+    weight: 7,
+    detail: "O texto da política cobre este ponto.",
+    evidence: cited(
+      "Trecho da política",
+      "“…incompletos ou desatualizados, <mark>anonimização</mark>, bloqueio ou <mark>eliminação dos dados</mark> desnecessários, e <mark>portabilidade</mark> a outro fornecedor, nos termos do <mark>art. 18</mark> da Lei nº 13.709/2018.”"
+    ),
+    norm: "LGPD, art. 9º, VII e art. 18",
+  }),
+  point({
+    state: "gap",
+    label: "A política informa o encarregado",
+    earned: 0,
+    weight: 4,
+    detail: "Não encontramos este ponto no texto da política.",
+    evidence: `            <figure class="evidence">
+              <figcaption>O que procuramos no texto</figcaption>
+              <div class="chips">
+                <span class="tag">encarregado</span>
+                <span class="tag">DPO</span>
+                <span class="tag">data protection officer</span>
+              </div>
+              <p class="sub small">Nenhum destes aparece nos 18.286 caracteres lidos. Procuramos a palavra, não o cargo nem a intenção: a política pode cobrir o ponto sem usar nenhum destes termos.</p>
+            </figure>`,
+    norm: "LGPD, art. 41",
+  }),
+];
+
+/** Uma seção da nota: o título, a soma dela, e os cards. */
+const half = (title, lede, earned, weight, cards, columns = 2) =>
+  `      <div class="col" style="gap: 14px">
+        <div class="between" style="align-items: flex-end">
+          <div class="col" style="gap: 3px">
+            <h2>${title}</h2>
+            <p class="sub small">${lede}</p>
+          </div>
+          <span class="tally">${earned}<em>/${weight}</em></span>
+        </div>
+        <div class="points" style="grid-template-columns: repeat(${columns}, minmax(0, 1fr)); --point-h: 304px">
+${cards.join("\n")}
+        </div>
+      </div>`;
+
+/**
+ * A tela do exame com a nota em cards, um por ponto da norma.
+ *
+ * Três coisas mudam em relação à lista. A nota total e a nota de cada ponto
+ * passam a ser o maior elemento onde estão, porque é o número que a pessoa
+ * procura e é sobre ele que ela vai agir. Cada ponto ganha espaço para uma
+ * evidência — o link onde a política está publicada, o trecho que cobre a
+ * revogação, os nomes que dispararam antes do banner —, e uma frase sozinha,
+ * que era tudo que a lista tinha, não é conferível. E a separação entre o que a
+ * loja faz e o que ela declara sai de subtítulo e vira seção com a sua própria
+ * soma, porque é a tese do produto: metade da nota é a distância entre as duas.
+ *
+ * Todos os cards têm a mesma altura. A nota de um ponto não pode parecer maior
+ * porque o trecho citado era mais comprido.
+ */
+export const ExameEmCards = (dark = false) =>
+  screen({
+    dark,
+    active: "exames",
+    store: S.store,
+    crumbs: `Painel <span>/</span> <strong>casadobolo.com.br</strong>`,
+    actions: `<a class="btn outline sm" href="#">${icon("doc", 14)} Documentos</a><a class="btn outline sm" href="#">${icon("shield", 14)} Banner</a><a class="btn sm" href="#">${icon("refresh", 14)} Examinar de novo</a>`,
+    page: `      <div class="page-head">
+        <div class="col" style="gap: 6px">
+          <h1 class="mono" style="font-size: 20px">casadobolo.com.br</h1>
+          <p class="sub" style="max-width: 620px">Cada exame é uma leitura desta loja num instante. Nada é recalculado depois: o que está aqui é o que o navegador viu naquele dia.</p>
+        </div>
+        <span class="sub small">31 de agosto de 2026, 14h02 · lido de São Paulo</span>
+      </div>
+
+      <div class="card" style="gap: 22px">
+        <div class="board">
+          <div class="board-cell">
+            <span class="num-lg">66<em> / 100</em></span>
+            <span class="board-label">nota desta leitura</span>
+          </div>
+          <div class="board-cell">
+            <span class="num-md">24<em>/45</em></span>
+            <span class="board-label">o que a loja faz</span>
+          </div>
+          <div class="board-cell">
+            <span class="num-md">42<em>/55</em></span>
+            <span class="board-label">o que a loja declara</span>
+          </div>
+        </div>
+        <p class="sub small" style="max-width: 660px">Esta pontuação é uma leitura técnica composta pelo bugsniff a partir do que o navegador observou. Não constitui parecer jurídico nem avaliação da situação legal da loja. Nesta leitura deu para medir os 100 pontos.</p>
+      </div>
+
+${half("O que a loja faz", "O que o navegador viu acontecer, antes e depois de responder ao banner.", 24, 45, FAZ)}
+
+${half("O que a loja declara", "O que a política publicada diz, no texto que este exame leu e guardou.", 42, 55, DECLARA)}
+
+      <div class="col" style="gap: 14px; padding-top: 8px">
+        <div class="col" style="gap: 3px">
+          <h2>As três marcas do card</h2>
+          <p class="sub small" style="max-width: 760px">Ponto cheio, ponto que faltou e ponto que esta leitura não conseguiu medir. O terceiro é o que importa: leitura que não chegou à política é falha nossa, e não pode parecer ponto perdido pela loja.</p>
+        </div>
+        <div class="points" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
+${point({
+  label: "A política dá um canal de contato",
+  earned: 6,
+  weight: 6,
+  detail: "O texto da política cobre este ponto.",
+  norm: "LGPD, art. 9º, IV",
+})}
+${point({
+  state: "gap",
+  label: "A política informa o encarregado",
+  earned: 0,
+  weight: 4,
+  detail: "Não encontramos este ponto no texto da política.",
+  norm: "LGPD, art. 41",
+})}
+${point({
+  state: "unmeasured",
+  label: "A política nomeia o que a loja usa",
+  detail:
+    "Sem a política lida, não há o que comparar. Nosso navegador não chegou nela a partir da home, o que não quer dizer que ela não exista.",
+  norm: "LGPD, art. 9º, V e art. 6º, VI",
+})}
+        </div>
+      </div>`,
+  });

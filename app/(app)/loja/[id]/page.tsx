@@ -60,7 +60,7 @@ export default async function StorePage({
       supabase
         .from("scans")
         .select(
-          "id, url, status, consent_banner, policy_state, policy_text, cookies, requests, created_at, store_id, failure"
+          "id, url, status, consent_banner, policy_state, policy_url, policy_text, cookies, requests, created_at, store_id, failure"
         )
         .eq("store_id", id)
         .order("created_at", { ascending: false }),
@@ -121,9 +121,7 @@ export default async function StorePage({
       </div>
 
       {latest && (
-        <Card className="px-6">
-          <ScoreCard score={scoreOf(latest, (trackers ?? []) as Tracker[])} />
-        </Card>
+        <ScoreCard score={scoreOf(latest, (trackers ?? []) as Tracker[])} />
       )}
 
       <Card className="gap-0 p-0">

@@ -1,5 +1,5 @@
 // As telas que faltavam, e os estados que o fluxo atravessa.
-import { artboard, screen, icon } from "./_parts.mjs";
+import { artboard, screen, icon, waiting, comingSkeleton } from "./_parts.mjs";
 
 const S = { store: "casadobolo.com.br" };
 
@@ -93,32 +93,20 @@ export const PainelVazio = screen({
 });
 
 /** Acabou de entrar na fila: nada foi lido ainda. */
+/**
+ * A fila, que é a espera antes de a espera começar.
+ *
+ * A casca é a mesma da leitura em andamento — mesma peça, outro passo —, e
+ * abaixo dela o esqueleto reserva a forma exata do resultado: o placar de
+ * números e a grade de cards na altura em que eles chegam.
+ */
 export const ExameNaFila = screen({
   active: "exames",
   store: S.store,
   crumbs: `casadobolo.com.br <span>/</span> Exames <span>/</span> <strong>agora</strong>`,
-  page: `      <div class="page-head">
-        <div class="col" style="gap: 6px">
-          <h1 class="mono" style="font-size: 20px">casadobolo.com.br</h1>
-          <div class="row" style="gap: 8px; align-items: center">
-            <span class="tag outline">na fila</span>
-            <span class="sub small">pedido há 3 segundos</span>
-          </div>
-        </div>
-      </div>
+  page: `${waiting({ at: 0, clock: "22 segundos", seconds: 22 })}
 
-      <div class="card" style="gap: 16px; align-items: center; text-align: center; padding: 48px 24px">
-        <div class="col" style="gap: 8px; align-items: center">
-          <span style="font-weight: 500">Na fila. Começa assim que uma vaga abrir.</span>
-          <p class="sub" style="max-width: 460px">Esta página se atualiza sozinha — pode fechar e voltar depois. Quando o exame terminar, o resultado está aqui.</p>
-          <p class="sub small" style="max-width: 460px">Começa assim que uma vaga abrir. Cada exame na frente leva de 30 segundos a dois minutos.</p>
-        </div>
-        <div class="col" style="gap: 10px; width: 420px">
-          <div class="bar" style="height: 10px; border-radius: 26px"></div>
-          <div class="bar" style="height: 10px; border-radius: 26px; width: 78%"></div>
-          <div class="bar" style="height: 10px; border-radius: 26px; width: 54%"></div>
-        </div>
-      </div>`,
+${comingSkeleton()}`,
 });
 
 /** A loja recusou o navegador: não é leitura limpa, é leitura que não houve. */

@@ -20,7 +20,6 @@ import { createClient } from "@/packages/supabase/server";
 import { IconFileText } from "@tabler/icons-react";
 import { AppShell } from "@/components/app-shell";
 import { ScoreCard } from "@/components/score-card";
-import { Card } from "@/components/ui/card";
 import { scoreOf } from "@/lib/score";
 import { buttonVariants } from "@/components/ui/button";
 import { failureMessage } from "@/lib/exams";
@@ -149,7 +148,9 @@ export default async function ScanPage({
     >
       {waiting && <Watch scanId={scan.id} />}
 
-      <div className="flex w-full max-w-2xl flex-col gap-6">
+      {/* Wider than a column of prose, because the score is now a grid of
+          cards and the tables under it were always cramped in one. */}
+      <div className="flex w-full max-w-5xl flex-col gap-6">
         <div>
           <h1 className="font-mono text-xl font-semibold">
             {canonicalHost(scan.url)}
@@ -203,11 +204,7 @@ export default async function ScanPage({
               platform={scan.consent_platform}
             />
             {scan.status === "done" && (
-              <Card className="px-6">
-                <ScoreCard
-                  score={scoreOf(scan, (trackers ?? []) as Tracker[])}
-                />
-              </Card>
+              <ScoreCard score={scoreOf(scan, (trackers ?? []) as Tracker[])} />
             )}
             <Findings findings={(scan.findings ?? []) as Finding[]} />
             <BeforeConsent

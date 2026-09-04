@@ -248,6 +248,68 @@ tbody tr:last-child td { border-bottom: 0; }
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
 .shot-pill { height: 18px; border-radius: 26px; background: var(--primary); width: 54px; }
+
+/* nota — o número é o que a pessoa vai agir sobre, então ele é o maior
+   elemento da página e do card. Nunca colorido pelo valor: nota alta não vira
+   verde, nota baixa não vira vermelho (ADR-0005). O tamanho é o destaque. */
+.board { display: flex; align-items: stretch; }
+.board-cell { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; padding: 0 36px; }
+.board-cell:first-child { padding-left: 0; }
+.board-cell + .board-cell { border-left: 1px solid var(--border); }
+.board-label { font-size: 13px; color: var(--muted-foreground); }
+.num-lg, .num-md, .pts, .tally {
+  font-family: "Noto Sans", sans-serif; font-weight: 600;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.num-lg { font-size: 76px; letter-spacing: -0.045em; }
+.num-md { font-size: 40px; letter-spacing: -0.03em; }
+.tally { font-size: 28px; letter-spacing: -0.03em; }
+.pts { font-size: 36px; letter-spacing: -0.035em; }
+.num-lg em, .num-md em, .pts em, .tally em {
+  font-style: normal; font-weight: 400; color: var(--muted-foreground);
+}
+.num-lg em { font-size: 22px; }
+.num-md em { font-size: 16px; }
+.tally em { font-size: 15px; }
+.pts em { font-size: 16px; }
+.pts.none { font-size: 15px; font-weight: 400; color: var(--muted-foreground); }
+
+/* um ponto da norma como card. Todos com a mesma altura: a nota de um ponto
+   não pode parecer maior porque o trecho citado era mais comprido. Âmbar só
+   onde faltou ponto, que é onde está a ação. */
+/* --point-h é a altura combinada da seção: todo card da tela sai do mesmo
+   tamanho, e o minmax deixa crescer se um trecho citado for maior que o
+   previsto — em vez de cortar a evidência para caber. */
+.points { display: grid; gap: 16px; grid-auto-rows: minmax(var(--point-h, 0px), 1fr); }
+.point {
+  height: 100%; display: flex; flex-direction: column; gap: 12px;
+  background: var(--card); border-radius: 18px; padding: 18px 20px;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+.point.gap { box-shadow: inset 3px 0 0 0 var(--primary), 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent); }
+.point.unmeasured { background: transparent; box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 8%, transparent); }
+.point-mark { color: var(--muted-foreground); flex-shrink: 0; }
+.point.gap .point-mark { color: var(--sidebar-primary); }
+.point-label { font-weight: 500; letter-spacing: -0.005em; }
+.norm { font-size: 12px; color: color-mix(in oklab, var(--muted-foreground) 75%, transparent); }
+
+/* a evidência ocupa o que sobra, para a altura igual não virar buraco */
+.evidence { margin: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.evidence figcaption { font-size: 11px; color: var(--muted-foreground); }
+.evidence blockquote {
+  margin: 0; flex: 1; padding: 12px 14px; border-radius: 12px;
+  background: var(--muted); color: var(--muted-foreground);
+  font-size: 13px; line-height: 1.6;
+}
+.evidence blockquote mark {
+  background: transparent; color: var(--foreground); font-weight: 500;
+  text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* a barra é o tempo, não o progresso */
+.timebar { height: 6px; border-radius: 26px; background: color-mix(in oklab, var(--foreground) 10%, transparent); overflow: hidden; }
+.timebar span { display: block; height: 100%; border-radius: 26px; background: var(--primary); }
 `;
 
 /** Ícones no traço do Tabler: viewBox 24, stroke 2, pontas redondas. */
@@ -265,6 +327,18 @@ export const icon = (name, size = 16) => {
       '<path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20"/><circle cx="9.5" cy="7" r="3.2"/><path d="M17 4.3a3.2 3.2 0 0 1 0 6.2M21 20v-1.5a4 4 0 0 0-3-3.8"/>',
     card: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5 13 6a6.4 6.4 0 0 1 2 .8l2.4-1 1.7 1.7-1 2.4a6.4 6.4 0 0 1 .8 2l2.5 1v2.4l-2.5 1a6.4 6.4 0 0 1-.8 2l1 2.4-1.7 1.7-2.4-1a6.4 6.4 0 0 1-2 .8l-1 2.5H10.6l-1-2.5a6.4 6.4 0 0 1-2-.8l-2.4 1-1.7-1.7 1-2.4a6.4 6.4 0 0 1-.8-2l-2.5-1V10.9l2.5-1a6.4 6.4 0 0 1 .8-2l-1-2.4L5.2 3.8l2.4 1a6.4 6.4 0 0 1 2-.8l1-2.5h2.4Z"/>',
+    "circle-check":
+      '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-4.5"/>',
+    "circle-x":
+      '<circle cx="12" cy="12" r="9"/><path d="m9.5 9.5 5 5M14.5 9.5l-5 5"/>',
+    "circle-dashed":
+      '<circle cx="12" cy="12" r="9" stroke-dasharray="2.4 3.1"/>',
+    "circle-check":
+      '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-4.5"/>',
+    "circle-x":
+      '<circle cx="12" cy="12" r="9"/><path d="m9.5 9.5 5 5M14.5 9.5l-5 5"/>',
+    "circle-dashed":
+      '<circle cx="12" cy="12" r="9" stroke-dasharray="2.4 3.1"/>',
     chevron: '<path d="m9 6 6 6-6 6"/>',
     down: '<path d="m6 9 6 6 6-6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -388,3 +462,125 @@ ${page}
     </div>
   </div>`,
   });
+
+/**
+ * A espera, do jeito que o componente a monta.
+ *
+ * Mora aqui e não numa tela porque são dois estados da mesma casca — a fila e
+ * a leitura em andamento —, e foi exatamente por estarem copiados em dois
+ * arquivos que um ganhou a barra do tempo e o outro ficou meses para trás.
+ *
+ * `at` é o passo corrente: 0 fila, 1 antes do consentimento, 2 depois dele.
+ */
+const STEPS = [
+  {
+    label: "Fila",
+    title: "Na fila",
+    detail: "Esperando uma vaga para abrir o navegador.",
+  },
+  {
+    label: "Antes do consentimento",
+    title: "Lendo a loja antes de qualquer interação",
+    detail:
+      "Abrindo a loja num navegador de verdade e registrando o que ela grava sem perguntar nada.",
+  },
+  {
+    label: "Depois do consentimento, e a política",
+    title: "Respondendo ao banner e procurando a política",
+    detail:
+      "Aceitando o banner para ver o que muda depois, e localizando a política de privacidade publicada.",
+  },
+];
+
+/** O teto do exame, que é onde a barra do tempo termina. */
+const CEILING = 180;
+
+const mark = (done, doing) =>
+  done
+    ? `<span style="color: var(--muted-foreground); display: flex">${icon("check", 15)}</span>`
+    : `<span style="display: flex; width: 15px; justify-content: center; color: ${doing ? "var(--sidebar-primary)" : "color-mix(in oklab, var(--muted-foreground) 40%, transparent)"}"><span style="border-radius: 999px; ${doing ? "width: 8px; height: 8px; background: currentColor" : "width: 6px; height: 6px; border: 1px solid currentColor"}"></span></span>`;
+
+export const waiting = ({ at, clock, seconds }) => {
+  const slow = seconds > 75;
+
+  return `      <div class="page-head">
+        <div class="col" style="gap: 6px">
+          <h1 class="mono" style="font-size: 20px">casadobolo.com.br</h1>
+          <div class="row" style="gap: 8px; align-items: center">
+            ${
+              at === 0
+                ? `<span class="tag outline">na fila</span>
+            <span class="sub small">pedido há ${clock}</span>`
+                : `<span class="tag"><span style="width: 6px; height: 6px; border-radius: 999px; background: currentColor"></span> lendo</span>
+            <span class="sub small">começou há ${clock}</span>`
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="gap: 20px; background: color-mix(in oklab, var(--primary) 10%, var(--card))">
+        <div class="row" style="gap: 12px; align-items: flex-start">
+          <span style="color: var(--sidebar-primary); margin-top: 2px; display: flex">${icon("scan", 18)}</span>
+          <div class="col" style="gap: 4px">
+            <span style="font-weight: 500">${STEPS[at].title}</span>
+            <p class="sub" style="max-width: 560px">${STEPS[at].detail} Esta página se atualiza sozinha — pode fechar e voltar depois.</p>
+          </div>
+        </div>
+
+        <div class="col" style="gap: 10px">
+${STEPS.map(
+  (step, index) =>
+    `          <span class="row" style="gap: 10px; align-items: center; ${index === at ? "font-weight: 500" : index < at ? "color: var(--muted-foreground)" : "color: color-mix(in oklab, var(--muted-foreground) 70%, transparent)"}">${mark(index < at, index === at)}<span>${step.label}</span></span>`
+).join("\n")}
+        </div>
+
+        <div class="col" style="gap: 6px">
+          <div class="timebar"><span style="width: ${Math.round((seconds / CEILING) * 100)}%"></span></div>
+          <div class="between">
+            <span class="sub small num">${clock} decorridos</span>
+            <span class="sub small">para sozinho em 3min</span>
+          </div>
+        </div>
+
+        <p class="sub small" style="max-width: 560px">${
+          at === 0
+            ? "Começa assim que uma vaga abrir. Cada exame na frente leva de 30 segundos a dois minutos."
+            : slow
+              ? "Esta loja está levando mais que a média — costuma acontecer com loja pesada, que continua carregando por um minuto ou mais. O exame segue."
+              : "A barra é o tempo, não o progresso: ela anda com o relógio até o teto acima, porque quanto falta é justamente o que não sabemos. Costuma terminar em menos de um minuto."
+        }</p>
+      </div>`;
+};
+
+/**
+ * O lugar do resultado, na forma exata em que ele chega.
+ *
+ * Não é enfeite: a página salta de uma linha de texto para um relatório
+ * inteiro, e reservar a forma é o que impede a chegada de empurrar o que a
+ * pessoa estava lendo para fora da tela. Por isso a forma tem que ser a de
+ * verdade — o placar de números e a grade de cards na altura em que eles vêm.
+ */
+export const comingSkeleton = () => `      <div class="card">
+        <div class="row" style="gap: 36px">
+          <div class="block" style="width: 160px; height: 76px"></div>
+          <div class="block" style="width: 96px; height: 76px"></div>
+          <div class="block" style="width: 96px; height: 76px"></div>
+        </div>
+        <div class="col" style="gap: 10px">
+          <div class="bar" style="max-width: 448px"></div>
+          <div class="bar" style="max-width: 384px"></div>
+        </div>
+      </div>
+
+      <div class="points" style="grid-template-columns: repeat(2, minmax(0, 1fr)); --point-h: 320px">
+${[0, 1, 2, 3]
+  .map(
+    () => `        <div class="point">
+          <div class="block" style="width: 80px; height: 36px"></div>
+          <div class="bar" style="max-width: 260px; height: 14px"></div>
+          <div class="block" style="flex: 1"></div>
+          <div class="bar" style="width: 112px"></div>
+        </div>`
+  )
+  .join("\n")}
+      </div>`;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { scoreOf, type Dimension } from "./score";
+import { scoreOf, tally, type Dimension } from "./score";
 
 const TRACKERS = [
   {
@@ -162,5 +162,137 @@ describe("o que a leitura não conseguiu medir", () => {
     expect(of({ ...noPolicy, consent_banner: "unrecognised" }).measured).toBe(
       30
     );
+  });
+});
+
+/**
+ * The excerpt is what makes a point checkable, so what it must never do is
+ * quote the policy wrong. Two things are being tested: that the marked run is
+ * the store's own words and not ours, and that the offsets survive an accent —
+ * they come from the folded text and are used to slice the original.
+ */
+describe("o trecho citado", () => {
+  const evidence = (over: object, key: string) => dim(over, key).evidence!;
+
+  const plain = (over: object, key: string) => {
+    const ev = evidence(over, key);
+    if (ev.kind !== "excerpt") throw new Error(`${key} não citou trecho`);
+    return ev.segments.map((s) => s.text).join("");
+  };
+
+  const marks = (over: object, key: string) => {
+    const ev = evidence(over, key);
+    if (ev.kind !== "excerpt") throw new Error(`${key} não citou trecho`);
+    return ev.segments.filter((s) => s.mark).map((s) => s.text);
+  };
+
+  test("marks the store's own words, not ours", () => {
+    expect(marks({}, "revogacao")).toEqual(["revogar"]);
+    expect(marks({}, "contato")).toEqual([
+      "Fale conosco",
+      "privacidade@exemplo.com.br",
+    ]);
+  });
+
+  test("quotes text that is really in the policy", () => {
+    const quoted = plain({}, "revogacao").replaceAll("…", "");
+    expect(COMPLETE.replace(/\s+/g, " ")).toContain(
+      quoted.replace(/\s+/g, " ")
+    );
+  });
+
+  // The offsets are computed over text without accents. A policy with accents
+  // before the match is what catches an off-by-one in that mapping.
+  test("does not slide when the policy has accents before the match", () => {
+    const policy_text =
+      "Informação, manutenção e proteção: você poderá revogar o consentimento.";
+
+    expect(marks({ policy_text }, "revogacao")).toEqual(["revogar"]);
+  });
+
+  // A quote that opens halfway through the previous sentence reads as a
+  // mis-citation even when every word is the store's. This is also the one
+  // that catches the excerpt window sliding: it passed while the sentence
+  // break was being skipped outright.
+  test("opens the quote at the sentence the match lives in", () => {
+    // Long enough on both sides that the window opens mid-preamble and the
+    // sentence break sits just inside it, which is the only shape where a
+    // mis-offset search for that break shows up at all.
+    const policy_text = `Esta loja trata dados pessoais de quem visita para operar o carrinho, medir a navegação, atender pedidos e cumprir obrigações legais, sempre nos termos desta política e da legislação aplicável. O titular tem à sua disposição os canais indicados adiante e, além deles, a possibilidade de rever a escolha feita no banner, podendo revogar o consentimento a qualquer tempo.`;
+
+    expect(plain({ policy_text }, "revogacao")).toMatch(/^…O titular tem/);
+  });
+
+  // The patterns are declared best-first, so the excerpt has to follow the
+  // list and not the document: an address is the contact channel, a sentence
+  // that merely says "canal de atendimento" is a reference to one.
+  test("anchors on the strongest match, not the leftmost", () => {
+    // Far enough apart that only one of the two can be in the window: the
+    // weaker phrase comes first in the document, the address comes first in
+    // the pattern list, and the excerpt has to follow the list.
+    const policy_text = `Fale conosco pelo canal de atendimento indicado no rodapé desta página, de segunda a sexta, das nove às dezoito horas, exceto feriados nacionais, para assuntos comerciais, trocas, devoluções, prazos de entrega, cancelamentos e demais dúvidas sobre os seus pedidos nesta loja. Para exercer os direitos previstos na legislação de proteção de dados, escreva para dpo@exemplo.com.br.`;
+
+    const quoted = plain({ policy_text }, "contato");
+    expect(quoted).toContain("dpo@exemplo.com.br");
+    expect(quoted).not.toContain("Fale conosco");
+  });
+
+  // Policy text arrives wrapped at whatever width the page used. A wrap is not
+  // a full stop, and treating it as one cut the controller's own name off the
+  // front of the evidence that was supposed to identify them.
+  test("does not take a wrapped line for the end of a sentence", () => {
+    const policy_text =
+      "A Doceria Exemplo Ltda., inscrita no CNPJ sob o nº\n12.345.678/0001-90, é a controladora dos dados.";
+
+    expect(plain({ policy_text }, "controlador")).toContain("Doceria Exemplo");
+  });
+
+  test("does not put an ellipsis after a full stop", () => {
+    const policy_text =
+      "Usamos cookies. Você pode revogar o consentimento quando quiser. Guardamos o registro do seu aceite por cinco anos.";
+
+    expect(plain({ policy_text }, "revogacao")).not.toContain(".…");
+  });
+
+  test("marks every hit that fell inside the same passage", () => {
+    const policy_text =
+      "Você tem portabilidade, anonimização e correção de dados, nos termos do art. 18.";
+
+    expect(marks({ policy_text }, "direitos").length).toBeGreaterThan(1);
+  });
+
+  // "Não encontramos" is unfalsifiable on its own. The words we looked for are
+  // what let somebody tell us we looked for the wrong ones.
+  test("says which words it looked for when the point is not there", () => {
+    const ev = evidence(
+      { policy_text: "Nada sobre isso aqui." },
+      "encarregado"
+    );
+
+    if (ev.kind !== "names") throw new Error("devia listar o que procuramos");
+    expect(ev.rows[0].items).toContain("DPO");
+  });
+});
+
+describe("tally", () => {
+  test("splits the score into the two halves it is made of", () => {
+    const score = of({ cookies: [{ name: "_fbp", phase: "post-consent" }] });
+
+    expect(tally(score, "faz")).toMatchObject({ earned: 45, weight: 45 });
+    expect(tally(score, "declara")).toMatchObject({ earned: 55, weight: 55 });
+  });
+
+  // A half shown out of its full weight when part of it was unreadable would
+  // put our own blind spot on the store's account.
+  test("leaves out of the half what the reading could not measure", () => {
+    const score = of({ consent_banner: "unrecognised" });
+
+    expect(tally(score, "faz").weight).toBe(30);
+  });
+
+  test("says when a whole half went unmeasured", () => {
+    const score = of({ policy_state: "not-found", policy_text: null });
+
+    expect(tally(score, "declara").measured).toBe(false);
   });
 });

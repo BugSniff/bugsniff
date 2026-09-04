@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { summarise, trackersIn, type Exam } from "./exams";
+import {
+  failureMessage,
+  failureShort,
+  summarise,
+  trackersIn,
+  type Exam,
+} from "./exams";
 
 const TRACKERS = [
   {
@@ -90,5 +96,31 @@ describe("summarise", () => {
 
   test("ignores a scan that belongs to no store", () => {
     expect(summarise(stores, [exam({ store_id: null })])).toEqual([]);
+  });
+});
+
+describe("failureMessage", () => {
+  /**
+   * `FAILURES` is keyed by loose strings, because the queue writes into it too
+   * and its keys are not `ScanRejection`. That is deliberate, and it is also
+   * why a mistyped key is invisible: it falls through to the generic sentence
+   * and the screen reads "o exame não pôde ser concluído" about a failure we
+   * had a real explanation for.
+   */
+  test("names our own browser rather than blaming the store", () => {
+    const message = failureMessage("browser-unavailable");
+
+    expect(message).toContain("Nosso navegador não subiu");
+    expect(message).not.toBe(failureMessage("qualquer-outra-coisa"));
+  });
+
+  test("falls back to a sentence rather than to nothing", () => {
+    expect(failureMessage(null)).toBe("O exame não pôde ser concluído.");
+  });
+
+  test("the short form is the first clause of the whole one", () => {
+    expect(failureShort("browser-unavailable")).toBe(
+      "Nosso navegador não subiu, então a loja não chegou a ser aberta"
+    );
   });
 });

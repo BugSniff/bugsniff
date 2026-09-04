@@ -1,5 +1,5 @@
-import { type Browser, type Page } from "playwright-core";
-import { openBrowser, visitorContext } from "./browser";
+import { type Page } from "playwright-core";
+import { openVisitor } from "./browser";
 import {
   acceptConsentBanner,
   detectConsentPlatform,
@@ -105,7 +105,20 @@ export type ScanRejection =
    * page that was still parsing when we stopped watching cannot support the
    * sentence "nenhum cookie foi gravado nesta loja" (#34).
    */
-  | "unfinished";
+  | "unfinished"
+  /**
+   * Our own browser never came up, so the store was never opened.
+   *
+   * The only rejection here that says nothing whatsoever about the shop, and it
+   * is separate for exactly that reason: reporting it as `unreachable` would
+   * publish "a loja não respondeu" about a store nobody ever knocked on.
+   *
+   * It exists because the failure it names used to have no name. A browser that
+   * hung took the whole invocation down with it at `maxDuration`, past every
+   * `catch` in this file, and left the row `running` with nothing written — an
+   * exam that waits forever rather than one that failed.
+   */
+  | "browser-unavailable";
 
 export type Scan =
   | {
@@ -338,16 +351,16 @@ export async function observeStore(
   onPreConsent?: (reading: PreConsentReading) => Promise<void>,
   { parseMs = PARSE_BUDGET_MS }: Patience = {}
 ): Promise<Scan> {
-  let browser: Browser | undefined;
+  // A fresh browser and a fresh context per scan, so one store never sees
+  // another store's cookies — and so the reading is of this store alone. How
+  // the context presents itself, and why, is in `visitorContext`; the deadline
+  // on getting it at all is in `openVisitor`.
+  const visitor = await openVisitor();
+  if (!visitor) return { ok: false, reason: "browser-unavailable" };
+
+  const { browser, context, page } = visitor;
+
   try {
-    browser = await openBrowser();
-
-    // A fresh context per scan, so one store never sees another store's
-    // cookies — and so the reading is of this store alone. How it presents
-    // itself, and why, is in `visitorContext`.
-    const context = await visitorContext(browser);
-    const page = await context.newPage();
-
     // Every URL the page reaches for, from the first byte. Requests are the
     // half of "tracker" that leaves nothing behind: a pixel fired by image or
     // by `sendBeacon` writes no cookie at all, and today the store that only
@@ -480,7 +493,10 @@ export async function observeStore(
     // pasted the URL — the store did not answer.
     return { ok: false, reason: "unreachable" };
   } finally {
-    await browser?.close();
+    // Swallowed on purpose: a close that throws would replace a reading we
+    // already have with an exception, and an exception out of here is the shape
+    // of failure that leaves the row `running` and the exam waiting forever.
+    await browser.close().catch(() => {});
   }
 }
 

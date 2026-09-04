@@ -41,7 +41,8 @@ const PAGES = [
       ["NovoExame", C.NovoExame, 1440, 900],
       ["PainelVazio", C.PainelVazio, 1440, 960],
       ["ExameNaFila", C.ExameNaFila, 1440, 1420],
-      ["ExameNaoMedido", C.ExameNaoMedido, 1440, 1040],
+      ["ExameNaoMedido", C.ExameNaoMedido, 1440, 1240],
+      ["EstadosDoExame", C.EstadosDoExame, 1440, 1000],
     ],
   },
   {
@@ -141,7 +142,20 @@ const PAGES = [
       ["FluxoRelatorio", B.Relatorio(), 1440, 1000, "10 · Relatório"],
       ["FluxoDocumentos", B.Documentos, 1440, 900, "11 · Documentos"],
       ["FluxoLojas", B.Lojas, 1440, 640, "12 · As lojas da pessoa"],
-      ["FluxoNaoMedido", C.ExameNaoMedido, 1440, 1040, "Desvio · não medido"],
+      [
+        "FluxoNaoMedido",
+        C.ExameNaoMedido,
+        1440,
+        1240,
+        "Desvio · a loja barrou",
+      ],
+      [
+        "FluxoEstados",
+        C.EstadosDoExame,
+        1440,
+        1000,
+        "Desvio · os onze motivos",
+      ],
     ],
   },
 ];

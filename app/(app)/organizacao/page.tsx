@@ -1,5 +1,4 @@
 import { IconAlertCircle, IconCrown, IconMail } from "@tabler/icons-react";
-import { headers } from "next/headers";
 import { AppShell } from "@/components/app-shell";
 import { SubmitButton } from "@/components/submit-button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { requestOrigin } from "@/lib/origin";
 import { timeAgo } from "@/lib/time";
 import { createAdminClient } from "@/packages/supabase/admin";
 import { createClient } from "@/packages/supabase/server";
@@ -95,7 +95,10 @@ export default async function OrganizacaoPage({
   const canManage = me?.role === "owner" || me?.role === "admin";
   const isOwner = me?.role === "owner";
 
-  const origin = (await headers()).get("origin") ?? "";
+  // Not the `Origin` header, which a page render never carries: with `?? ""`
+  // the invite link below rendered as "/convite/<token>", and an admin copying
+  // it handed somebody a URL with no host on it.
+  const origin = await requestOrigin();
 
   return (
     <AppShell

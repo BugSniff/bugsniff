@@ -45,6 +45,8 @@ const FAILURES: Record<string, string> = {
     "A loja respondeu, mas o carregamento dela não terminou dentro do tempo do exame, e nosso navegador não chegou a observar nada. Não é loja limpa: é um exame que não aconteceu.",
   abandoned:
     "O exame começou e a execução dele foi interrompida antes de terminar. Não é uma resposta da loja: é uma falha nossa, e ele foi tentado de novo até desistirmos.",
+  "browser-unavailable":
+    "Nosso navegador não subiu, então a loja não chegou a ser aberta. Não é uma resposta da loja: é uma falha nossa, e não há nada a corrigir do lado de quem pediu o exame.",
 };
 
 /** A frase inteira. */
